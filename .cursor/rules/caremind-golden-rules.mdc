@@ -1,0 +1,52 @@
+---
+description: CareMind AI backend golden rules — enforced on every file
+alwaysApply: true
+---
+
+# CareMind AI — Golden Rules
+
+## File Size
+- No file may exceed **350 lines**. If it grows beyond that, split it into sub-modules immediately (use `.part2.ts` suffix or extract a sub-service).
+
+## Architecture
+- Every external integration is behind an **interface (adapter pattern)**. Swapping vendors requires changing exactly one file and one env var.
+- **No business logic in route handlers.** Routes call service functions; service functions call adapters/repositories.
+- **Multi-tenancy is structural**: each org gets its own PostgreSQL database. Central DB holds only org registry, auth tokens, and billing.
+
+## Security (non-negotiable)
+- `patient_id`, `org_id`, `role` are **always resolved server-side from the JWT** — never trusted from client request body.
+- All PHI-touching operations are **audit-logged** via `auditLog()` in `src/core/audit-logger.ts`.
+- Passwords hashed with **bcrypt cost 12+**.
+- Refresh tokens are **single-use and hashed** in DB — never stored in plain text.
+- Vector search **always** includes `patient_id + org_id` filters. These are mandatory and cannot be bypassed.
+- Recording only starts after **confirmed consent** in DB (`consentStatus = 'accepted'`).
+- AI outputs **never** enter the knowledge base without `status = 'approved'`.
+
+## TypeScript
+- **Strict mode on.** No `any` without an explicit suppression comment explaining why.
+- No implicit `any`. Prefer explicit types over inference for public function signatures.
+
+## MVP Vendor Lock-In (do not deviate)
+| Capability | MVP Provider |
+|---|---|
+| AI / LLM | OpenRouter only |
+| Embeddings | Voyage AI only |
+| Storage | MinIO only |
+| Meetings | LiveKit only |
+| STT | Deepgram only |
+| OCR | OCR.Space only |
+| Email | Resend only |
+| PDF Export | Puppeteer only |
+| Queue | BullMQ + Redis only |
+| Database | PostgreSQL + pgvector only |
+
+Do **not** create adapters, env vars, or Docker containers for alternative providers unless explicitly requested.
+
+## Response Envelope
+All API responses follow:
+```json
+// Success
+{ "data": {...}, "meta": { "requestId": "...", "timestamp": "..." } }
+// Error
+{ "error": { "code": "...", "message": "...", "details": [...] } }
+```

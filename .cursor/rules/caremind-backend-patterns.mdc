@@ -1,0 +1,68 @@
+---
+description: CareMind AI backend code patterns for TypeScript files
+globs: backend/**/*.ts
+alwaysApply: false
+---
+
+# Backend Code Patterns
+
+## Module Structure
+Every feature module in `src/modules/{name}/` must have exactly:
+- `{name}.routes.ts` — Express Router only; no business logic
+- `{name}.service.ts` — business logic; calls adapters/repos
+- `{name}.repository.ts` — Prisma queries only
+- `{name}.schema.ts` — Zod validation schemas
+- `{name}.types.ts` — module-local TS types (if needed)
+
+## Route Handler Pattern
+```typescript
+// ✅ CORRECT — route calls service, no logic in handler
+router.post('/resource', validate({ body: schema }), asyncHandler(async (req, res) => {
+  const result = await service.doThing(req.auth, req.tenantPrisma, req.body);
+  res.status(201).json({ data: result, meta: { requestId: uuidv4(), timestamp: new Date().toISOString() } });
+}));
+
+// ❌ WRONG — business logic in route handler
+router.post('/resource', asyncHandler(async (req, res) => {
+  const patient = await prisma.patient.findUnique({ where: { id: req.body.patientId } });
+  // ... more logic
+}));
+```
+
+## Adapter Usage
+```typescript
+// ✅ CORRECT — import from index (factory), not concrete adapter
+import { getAiChatAdapter } from '../../adapters/ai/index.js';
+
+// ❌ WRONG — import concrete adapter directly
+import { createOpenRouterAdapter } from '../../adapters/ai/openrouter.adapter.js';
+```
+
+## PHI Access Pattern
+```typescript
+// ✅ CORRECT — always audit PHI access
+await auditLog({ tenantPrisma, userId: auth.userId, orgId: auth.orgId,
+  action: 'READ_RECORD', resourceType: 'Patient', resourceId: patientId });
+
+// ❌ WRONG — reading PHI without audit log
+const patient = await tenantPrisma.patient.findUnique({ where: { id } });
+return patient;
+```
+
+## Error Handling
+```typescript
+// ✅ Use typed errors from src/core/errors.ts
+throw new NotFoundError('Patient not found');
+throw new ForbiddenError('Access denied');
+throw new ValidationError('Invalid input', zodIssues);
+
+// ❌ Never throw raw errors in service layer
+throw new Error('something went wrong');
+```
+
+## File Extensions
+All imports in `.ts` files must use `.js` extension (NodeNext module resolution):
+```typescript
+import { foo } from './foo.js'; // ✅
+import { foo } from './foo';    // ❌
+```

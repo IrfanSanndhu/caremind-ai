@@ -1,0 +1,247 @@
+generator client {
+  provider        = "prisma-client-js"
+  output          = "../../node_modules/.prisma/tenant-client"
+  previewFeatures = ["postgresqlExtensions"]
+}
+
+datasource db {
+  provider   = "postgresql"
+  url        = env("TENANT_DATABASE_URL")
+  extensions = [pgvector(map: "vector")]
+}
+
+model Patient {
+  id          String   @id @default(uuid())
+  userId      String   // references central DB users.id
+  orgId       String
+  firstName   String
+  lastName    String
+  dateOfBirth DateTime?
+  phone       String?
+  deletedAt   DateTime?
+  createdAt   DateTime @default(now())
+
+  appointments Appointment[]
+  documents    Document[]
+  vectorChunks VectorChunk[]
+
+  @@index([orgId])
+  @@index([userId])
+  @@map("patients")
+}
+
+model Doctor {
+  id            String   @id @default(uuid())
+  userId        String   // references central DB users.id
+  orgId         String
+  firstName     String
+  lastName      String
+  specialty     String?
+  licenseNumber String?
+  deletedAt     DateTime?
+  createdAt     DateTime @default(now())
+
+  appointments Appointment[]
+
+  @@index([orgId])
+  @@index([userId])
+  @@map("doctors")
+}
+
+enum AppointmentStatus {
+  scheduled
+  in_progress
+  completed
+  cancelled
+}
+
+enum ConsentStatus {
+  pending
+  accepted
+  declined
+}
+
+model Appointment {
+  id                String            @id @default(uuid())
+  orgId             String
+  patientId         String
+  doctorId          String
+  scheduledAt       DateTime
+  status            AppointmentStatus @default(scheduled)
+  livekitRoomName   String?
+  noRecording       Boolean           @default(false)
+  consentStatus     ConsentStatus     @default(pending)
+  consentTimestamp  DateTime?
+  createdAt         DateTime          @default(now())
+
+  patient    Patient  @relation(fields: [patientId], references: [id])
+  doctor     Doctor   @relation(fields: [doctorId], references: [id])
+  recordings ConsultationRecording[]
+  transcripts Transcript[]
+  aiOutputs  AiOutput[]
+
+  @@index([orgId])
+  @@index([patientId])
+  @@index([doctorId])
+  @@map("appointments")
+}
+
+enum RecordingStatus {
+  uploaded
+  processing
+  ready
+  failed
+}
+
+model ConsultationRecording {
+  id              String          @id @default(uuid())
+  appointmentId   String
+  orgId           String
+  storageBucket   String
+  storageKey      String
+  durationSeconds Float?
+  status          RecordingStatus @default(uploaded)
+  createdAt       DateTime        @default(now())
+
+  appointment Appointment @relation(fields: [appointmentId], references: [id])
+
+  @@index([appointmentId])
+  @@map("consultation_recordings")
+}
+
+model Transcript {
+  id              String   @id @default(uuid())
+  appointmentId   String
+  orgId           String
+  fullText        String   @db.Text
+  segments        Json
+  durationSeconds Float?
+  createdAt       DateTime @default(now())
+
+  appointment Appointment @relation(fields: [appointmentId], references: [id])
+
+  @@index([appointmentId])
+  @@map("transcripts")
+}
+
+enum AiOutputType {
+  soap_note
+  clinical_summary
+  patient_summary
+  follow_up_instructions
+}
+
+enum AiOutputStatus {
+  pending_review
+  approved
+  rejected
+  edited
+}
+
+model AiOutput {
+  id                  String         @id @default(uuid())
+  appointmentId       String
+  orgId               String
+  type                AiOutputType
+  content             String         @db.Text
+  originalContent     String         @db.Text
+  status              AiOutputStatus @default(pending_review)
+  reviewedByDoctorId  String?
+  reviewedAt          DateTime?
+  createdAt           DateTime       @default(now())
+
+  appointment Appointment @relation(fields: [appointmentId], references: [id])
+
+  @@index([appointmentId])
+  @@index([orgId, status])
+  @@map("ai_outputs")
+}
+
+enum DocumentProcessingStatus {
+  pending
+  processing
+  ready
+  failed
+}
+
+model Document {
+  id               String                   @id @default(uuid())
+  orgId            String
+  patientId        String
+  uploadedBy       String                   // central userId
+  fileName         String
+  mimeType         String
+  storageBucket    String
+  storageKey       String
+  extractedText    String?                  @db.Text
+  processingStatus DocumentProcessingStatus @default(pending)
+  documentType     String?
+  createdAt        DateTime                 @default(now())
+
+  patient      Patient       @relation(fields: [patientId], references: [id])
+  vectorChunks VectorChunk[]
+
+  @@index([orgId])
+  @@index([patientId])
+  @@map("documents")
+}
+
+model VectorChunk {
+  id           String                      @id @default(uuid())
+  orgId        String
+  patientId    String
+  documentId   String?
+  appointmentId String?
+  documentType String
+  content      String                      @db.Text
+  embedding    Unsupported("vector(1024)")?
+  metadata     Json                        @default("{}")
+  createdAt    DateTime                    @default(now())
+
+  patient  Patient   @relation(fields: [patientId], references: [id])
+  document Document? @relation(fields: [documentId], references: [id])
+
+  @@index([orgId, patientId])
+  @@map("vector_chunks")
+}
+
+enum NotificationChannel {
+  email
+  sms
+}
+
+enum NotificationStatus {
+  pending
+  sent
+  failed
+}
+
+model Notification {
+  id        String             @id @default(uuid())
+  orgId     String
+  userId    String
+  channel   NotificationChannel
+  type      String
+  status    NotificationStatus @default(pending)
+  sentAt    DateTime?
+  createdAt DateTime           @default(now())
+
+  @@index([orgId, userId])
+  @@map("notifications")
+}
+
+model AuditLog {
+  id           String   @id @default(uuid())
+  orgId        String
+  userId       String
+  action       String
+  resourceType String
+  resourceId   String
+  metadata     Json     @default("{}")
+  ipAddress    String?
+  createdAt    DateTime @default(now())
+
+  @@index([orgId, userId])
+  @@index([orgId, resourceType, resourceId])
+  @@map("audit_logs")
+}

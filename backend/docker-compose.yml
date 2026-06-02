@@ -1,0 +1,130 @@
+version: '3.9'
+
+services:
+  # ─── Central (Control-Plane) PostgreSQL ──────────────────────────────────
+  postgres-central:
+    image: pgvector/pgvector:pg16
+    container_name: caremind-postgres-central
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: caremind_central
+    ports:
+      - '5432:5432'
+    volumes:
+      - postgres-central-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U postgres']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ─── Tenant Template PostgreSQL ───────────────────────────────────────────
+  postgres-tenant-template:
+    image: pgvector/pgvector:pg16
+    container_name: caremind-postgres-tenant
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: postgres
+    ports:
+      - '5433:5432'
+    volumes:
+      - postgres-tenant-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U postgres']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ─── Redis (BullMQ queues) ────────────────────────────────────────────────
+  redis:
+    image: redis:7-alpine
+    container_name: caremind-redis
+    restart: unless-stopped
+    ports:
+      - '6379:6379'
+    volumes:
+      - redis-data:/data
+    command: redis-server --appendonly yes
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ─── MinIO (S3-compatible storage) ────────────────────────────────────────
+  minio:
+    image: minio/minio:latest
+    container_name: caremind-minio
+    restart: unless-stopped
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
+    ports:
+      - '9000:9000'
+      - '9001:9001'
+    volumes:
+      - minio-data:/data
+    healthcheck:
+      test: ['CMD', 'curl', '-f', 'http://localhost:9000/minio/health/live']
+      interval: 30s
+      timeout: 20s
+      retries: 3
+
+  # ─── Mailhog (dev email — SMTP 1025, web UI 8025) ─────────────────────────
+  mailhog:
+    image: mailhog/mailhog:latest
+    container_name: caremind-mailhog
+    restart: unless-stopped
+    ports:
+      - '1025:1025'
+      - '8025:8025'
+
+  # ─── Backend (LiveKit: use LIVEKIT_* from .env — hosted/cloud, not a local container) ──
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: caremind-backend
+    restart: unless-stopped
+    ports:
+      - '3000:3000'
+    env_file:
+      - .env
+    environment:
+      CENTRAL_DB_HOST: postgres-central
+      CENTRAL_DB_PORT: '5432'
+      CENTRAL_DB_USER: postgres
+      CENTRAL_DB_PASSWORD: password
+      CENTRAL_DB_NAME: caremind_central
+      TENANT_DB_HOST: postgres-tenant-template
+      TENANT_DB_PORT: '5432'
+      TENANT_DB_USER: postgres
+      TENANT_DB_PASSWORD: password
+      TENANT_DB_NAME_PREFIX: caremind_tenant_
+      REDIS_URL: redis://redis:6379
+      MINIO_ENDPOINT: minio
+      MINIO_PORT: '9000'
+      MINIO_USE_SSL: 'false'
+      # Override SMTP host when backend runs in Docker (Mailhog service name)
+      SMTP_HOST: mailhog
+      SMTP_PORT: '1025'
+    depends_on:
+      postgres-central:
+        condition: service_healthy
+      postgres-tenant-template:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+
+volumes:
+  postgres-central-data:
+  postgres-tenant-data:
+  redis-data:
+  minio-data:

@@ -1,0 +1,61 @@
+generator client {
+  provider = "prisma-client-js"
+  output   = "../../node_modules/.prisma/central-client"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("CENTRAL_DATABASE_URL")
+}
+
+enum UserRole {
+  patient
+  doctor
+  admin
+}
+
+model Organization {
+  id        String   @id @default(uuid())
+  name      String
+  slug      String   @unique
+  dbUrl     String   // encrypted at rest via application-layer encryption
+  plan      String   @default("starter")
+  createdAt DateTime @default(now())
+
+  users User[]
+
+  @@map("organizations")
+}
+
+model User {
+  id            String       @id @default(uuid())
+  email         String       @unique
+  passwordHash  String
+  role          UserRole
+  orgId         String
+  mfaEnabled    Boolean      @default(false)
+  mfaSecret     String?      // TOTP secret (encrypted)
+  deletedAt     DateTime?
+  createdAt     DateTime     @default(now())
+  lastLoginAt   DateTime?
+
+  organization  Organization @relation(fields: [orgId], references: [id])
+  refreshTokens RefreshToken[]
+
+  @@index([orgId])
+  @@map("users")
+}
+
+model RefreshToken {
+  id         String    @id @default(uuid())
+  userId     String
+  tokenHash  String    @unique
+  expiresAt  DateTime
+  revokedAt  DateTime?
+  createdAt  DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("refresh_tokens")
+}
