@@ -1,11 +1,48 @@
 import { v4 as uuidv4 } from 'uuid';
 import type { PrismaClient } from '../../../node_modules/.prisma/tenant-client/index.js';
 import * as repo from './consultations.repository.js';
+import { env } from '../../config/env.js';
+import { getCentralPrisma } from '../../core/tenant-registry.js';
 import { getLiveKitAdapter } from '../../adapters/livekit/index.js';
 import { transcriptionQueue } from '../../jobs/queue.js';
 import { auditLog } from '../../core/audit-logger.js';
 import { ForbiddenError, NotFoundError } from '../../core/errors.js';
 import type { AuthContext } from '../../types/auth.js';
+
+type AppointmentWithProfiles = NonNullable<
+  Awaited<ReturnType<typeof repo.findAppointmentById>>
+>;
+
+async function resolveParticipantDisplayName(
+  auth: AuthContext,
+  tenantPrisma: PrismaClient,
+  appointment: AppointmentWithProfiles,
+): Promise<string> {
+  if (auth.role === 'patient') {
+    const patient =
+      appointment.patient ??
+      (await repo.findPatientByUserId(tenantPrisma, auth.userId));
+    if (patient) return `${patient.firstName} ${patient.lastName}`.trim();
+  }
+
+  if (auth.role === 'doctor') {
+    const doctor =
+      appointment.doctor ??
+      (await repo.findDoctorByUserId(tenantPrisma, auth.userId));
+    if (doctor) return `Dr. ${doctor.firstName} ${doctor.lastName}`.trim();
+  }
+
+  const centralUser = await getCentralPrisma().user.findUnique({
+    where: { id: auth.userId },
+    select: { email: true },
+  });
+  if (centralUser?.email) {
+    const local = centralUser.email.split('@')[0] ?? 'Admin';
+    return local.charAt(0).toUpperCase() + local.slice(1);
+  }
+
+  return 'Admin';
+}
 
 export async function getJoinToken(
   auth: AuthContext,
@@ -36,14 +73,19 @@ export async function getJoinToken(
   const livekit = getLiveKitAdapter();
   const roomName = appointment.livekitRoomName ?? `${auth.orgId}_${appointmentId}`;
 
-  const isObserver = auth.role === 'admin';
-  const token = livekit.createRoomToken({
+  const displayName = await resolveParticipantDisplayName(auth, tenantPrisma, appointment);
+
+  const token = await livekit.createRoomToken({
     roomName,
     participantIdentity: auth.userId,
-    participantName: auth.userId,
-    canPublish: !isObserver,
+    participantName: displayName,
+    canPublish: true,
     canSubscribe: true,
-    metadata: JSON.stringify({ role: auth.role, orgId: auth.orgId }),
+    metadata: JSON.stringify({
+      role: auth.role,
+      orgId: auth.orgId,
+      displayName,
+    }),
   });
 
   await auditLog({
@@ -55,7 +97,7 @@ export async function getJoinToken(
     resourceId: appointmentId,
   });
 
-  return { token, roomName };
+  return { token, roomName, livekitUrl: env.LIVEKIT_URL };
 }
 
 export async function startRecording(

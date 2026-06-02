@@ -1,0 +1,101 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Consultation room: remote full-screen + local PiP */
+.consultation-stage .consultation-tile-main,
+.consultation-stage .consultation-tile-main .lk-participant-tile {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  max-height: none;
+  border-radius: 0;
+}
+
+.consultation-stage .consultation-tile-pip,
+.consultation-stage .consultation-tile-pip .lk-participant-tile {
+  width: 100%;
+  height: 100%;
+  border-radius: inherit;
+}
+
+.consultation-stage .lk-participant-media-video {
+  object-fit: cover;
+  width: 100%;
+  height: 100%;
+}
+
+.consultation-pip .lk-participant-name {
+  font-size: 0.65rem;
+}
+
+.consultation-pip {
+  will-change: transform, left, top;
+}
+
+@layer base {
+  *, *::before, *::after {
+    box-sizing: border-box;
+  }
+
+  html {
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+  }
+
+  body {
+    @apply bg-surface text-slate-900 font-sans text-base;
+    margin: 0;
+    padding: 0;
+  }
+
+  ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+
+  ::-webkit-scrollbar-track {
+    @apply bg-transparent;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    @apply bg-border rounded-full;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    @apply bg-muted;
+  }
+
+  input[type='search']::-webkit-search-cancel-button {
+    display: none;
+  }
+}
+
+@layer utilities {
+  .safe-area-bottom {
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+
+  .line-clamp-3 {
+    display: -webkit-box;
+    -webkit-line-clamp: 3;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+
+  .no-scrollbar {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+}
+
+@keyframes shimmer {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}

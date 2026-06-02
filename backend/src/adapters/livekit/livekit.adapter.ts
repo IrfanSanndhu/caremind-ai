@@ -14,7 +14,7 @@ export function createLiveKitAdapter(): LiveKitAdapter {
   );
 
   return {
-    createRoomToken({
+    async createRoomToken({
       roomName,
       participantIdentity,
       participantName,
@@ -38,9 +38,7 @@ export function createLiveKitAdapter(): LiveKitAdapter {
       };
 
       token.addGrant(grant);
-      // toJwt() is sync in livekit-server-sdk v2 when no async operations are needed
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      return (token as any).toJwt() as string;
+      return await token.toJwt();
     },
 
     async createRoom(roomName) {

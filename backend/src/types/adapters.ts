@@ -115,7 +115,7 @@ export interface LiveKitAdapter {
     canPublish: boolean;
     canSubscribe: boolean;
     metadata?: string;
-  }): string;
+  }): Promise<string>;
 
   createRoom(roomName: string): Promise<LiveKitRoomInfo>;
 

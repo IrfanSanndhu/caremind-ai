@@ -1,0 +1,108 @@
+import { apiClient, unwrap } from './client';
+import { userFromAccessToken } from '@/utils/jwt';
+import type {
+  LoginRequest,
+  LoginResponse,
+  MfaVerifyRequest,
+  RegisterOrgRequest,
+  User,
+  MfaSetupResponse,
+} from '@/types';
+
+/** Backend login success (no MFA) */
+interface BackendTokenPair {
+  accessToken: string;
+  refreshToken: string;
+}
+
+/** Backend MFA challenge */
+interface BackendMfaChallenge {
+  requiresMfa: true;
+  tempToken: string;
+}
+
+type BackendLoginResult = BackendTokenPair | BackendMfaChallenge;
+
+function isMfaChallenge(data: BackendLoginResult): data is BackendMfaChallenge {
+  return 'requiresMfa' in data && data.requiresMfa === true;
+}
+
+function isTokenPair(data: BackendLoginResult): data is BackendTokenPair {
+  return 'accessToken' in data && 'refreshToken' in data;
+}
+
+export const authApi = {
+  login: async (payload: LoginRequest): Promise<LoginResponse> => {
+    const res = await apiClient.post('/api/auth/login', payload);
+    const data = unwrap(res) as BackendLoginResult;
+
+    if (isMfaChallenge(data)) {
+      return { requiresMfa: true, mfaToken: data.tempToken };
+    }
+
+    if (isTokenPair(data)) {
+      return {
+        requiresMfa: false,
+        user: userFromAccessToken(data.accessToken, payload.email),
+        accessToken: data.accessToken,
+        refreshToken: data.refreshToken,
+      };
+    }
+
+    throw new Error('Unexpected login response from server');
+  },
+
+  verifyMfa: async (payload: MfaVerifyRequest): Promise<{ user: User; accessToken: string; refreshToken: string }> => {
+    const res = await apiClient.post('/api/auth/mfa/verify', {
+      code: payload.code,
+      tempToken: payload.mfaToken,
+    });
+    const data = unwrap(res) as BackendTokenPair;
+    if (!isTokenPair(data)) {
+      throw new Error('Unexpected MFA verify response from server');
+    }
+    // Email not returned after MFA — use placeholder; profile can refresh later
+    const user = userFromAccessToken(data.accessToken, '');
+    return {
+      user,
+      accessToken: data.accessToken,
+      refreshToken: data.refreshToken,
+    };
+  },
+
+  register: async (payload: RegisterOrgRequest): Promise<{ user: User; accessToken: string; refreshToken: string }> => {
+    const res = await apiClient.post('/api/auth/register-org', payload);
+    const data = unwrap(res) as BackendTokenPair;
+    if (!isTokenPair(data)) {
+      throw new Error('Unexpected register response from server');
+    }
+    return {
+      user: userFromAccessToken(data.accessToken, payload.adminEmail),
+      accessToken: data.accessToken,
+      refreshToken: data.refreshToken,
+    };
+  },
+
+  refreshToken: async (refreshToken: string): Promise<{ accessToken: string; refreshToken: string }> => {
+    const res = await apiClient.post('/api/auth/refresh', { refreshToken });
+    return unwrap(res);
+  },
+
+  logout: async (): Promise<void> => {
+    await apiClient.post('/api/auth/logout');
+  },
+
+  setupMfa: async (): Promise<MfaSetupResponse> => {
+    const res = await apiClient.post('/api/auth/mfa/setup');
+    return unwrap(res);
+  },
+
+  enableMfa: async (code: string): Promise<void> => {
+    await apiClient.post('/api/auth/mfa/confirm-setup', { code });
+  },
+
+};
+
+export const authKeys = {
+  me: ['auth', 'me'] as const,
+};
