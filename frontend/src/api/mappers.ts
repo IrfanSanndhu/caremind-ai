@@ -63,7 +63,13 @@ export function mapAuditLog(raw: {
   resourceId?: string | null;
   createdAt: string | Date;
   metadata?: unknown;
+  ipAddress?: string | null;
+  userEmail?: string;
+  userName?: string;
+  userRole?: string;
+  summary?: string;
 }): AuditLog {
+  const metadata = raw.metadata as Record<string, unknown> | undefined;
   return {
     id: raw.id,
     orgId: raw.orgId,
@@ -71,8 +77,23 @@ export function mapAuditLog(raw: {
     action: raw.action,
     resourceType: raw.resourceType,
     resourceId: raw.resourceId ?? undefined,
-    details: raw.metadata as Record<string, unknown> | undefined,
+    details: metadata,
+    ipAddress: raw.ipAddress ?? undefined,
     createdAt: typeof raw.createdAt === 'string' ? raw.createdAt : raw.createdAt.toISOString(),
+    userEmail: raw.userEmail,
+    userName: raw.userName,
+    userRole: raw.userRole,
+    summary: raw.summary,
+    user:
+      raw.userEmail || raw.userName
+        ? {
+            id: raw.userId,
+            email: raw.userEmail ?? '',
+            role: (raw.userRole as User['role']) ?? 'admin',
+            orgId: raw.orgId,
+            name: raw.userName,
+          }
+        : undefined,
   };
 }
 

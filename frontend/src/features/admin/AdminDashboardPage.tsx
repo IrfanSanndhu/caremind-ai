@@ -8,11 +8,13 @@ import {
   AreaChart, Area, PieChart, Pie, Cell,
   XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
 } from 'recharts';
-import { Button, Card, CardHeader, Skeleton } from '@/components/ui';
+import { Button, Card, CardHeader, Skeleton, Badge } from '@/components/ui';
+import { Avatar } from '@/components/ui/Avatar';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { adminApi, adminKeys } from '@/api/admin.api';
 import { AppointmentStatus } from '@/types';
 import { formatRelative } from '@/utils';
+import { getAuditLogDisplayName, getAuditLogSummary } from '@/utils/audit-log-labels';
 
 const PIE_COLORS = {
   scheduled: '#0EA5E9',
@@ -189,18 +191,22 @@ export function AdminDashboardPage() {
             <p className="py-8 text-center text-sm text-muted">No recent activity</p>
           ) : (
             activity.slice(0, 8).map((log) => (
-              <div key={log.id} className="flex items-center gap-4 py-3">
-                <div className="w-8 h-8 rounded-lg bg-surface flex items-center justify-center flex-shrink-0">
-                  <ShieldCheck className="w-4 h-4 text-muted" />
-                </div>
+              <div key={log.id} className="flex items-start gap-3 py-3">
+                <Avatar name={getAuditLogDisplayName(log)} size="xs" />
                 <div className="flex-1 min-w-0">
-                  <p className="text-sm text-slate-900">
-                    <span className="font-medium">{log.action}</span>
-                    {' '}&mdash; <span className="text-muted">{log.resourceType}</span>
+                  <p className="text-sm font-medium text-slate-900 truncate">
+                    {getAuditLogDisplayName(log)}
                   </p>
-                  <p className="text-xs text-muted truncate">{log.userId}</p>
+                  <p className="text-sm text-slate-700 leading-snug mt-0.5">
+                    {getAuditLogSummary(log)}
+                  </p>
+                  <Badge variant="gray" className="mt-1 font-mono text-[10px]">
+                    {log.action}
+                  </Badge>
                 </div>
-                <span className="text-xs text-muted whitespace-nowrap">{formatRelative(log.createdAt)}</span>
+                <span className="text-xs text-muted whitespace-nowrap flex-shrink-0">
+                  {formatRelative(log.createdAt)}
+                </span>
               </div>
             ))
           )}

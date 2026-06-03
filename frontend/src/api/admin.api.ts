@@ -17,17 +17,24 @@ export interface ListAuditLogsParams {
   pageSize?: number;
 }
 
+interface BackendAuditLogRow {
+  id: string;
+  orgId: string;
+  userId: string;
+  action: string;
+  resourceType: string;
+  resourceId?: string | null;
+  createdAt: string;
+  metadata?: unknown;
+  ipAddress?: string | null;
+  userEmail?: string;
+  userName?: string;
+  userRole?: string;
+  summary?: string;
+}
+
 interface BackendAuditLogsPage {
-  logs: Array<{
-    id: string;
-    orgId: string;
-    userId: string;
-    action: string;
-    resourceType: string;
-    resourceId?: string | null;
-    createdAt: string;
-    metadata?: unknown;
-  }>;
+  logs: BackendAuditLogRow[];
   total: number;
   page: number;
   limit: number;

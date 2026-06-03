@@ -209,6 +209,10 @@ export interface AuditLog {
   ipAddress?: string;
   createdAt: string;
   user?: User;
+  userEmail?: string;
+  userName?: string;
+  userRole?: string;
+  summary?: string;
 }
 
 export interface DashboardStats {

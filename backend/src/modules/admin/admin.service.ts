@@ -3,6 +3,7 @@ import { getCentralPrisma } from '../../core/tenant-registry.js';
 import { auditLog } from '../../core/audit-logger.js';
 import type { AuthContext } from '../../types/auth.js';
 import { z } from 'zod';
+import { enrichAuditLogs } from './audit-log-enrichment.js';
 
 export const auditLogQuerySchema = z.object({
   page: z.coerce.number().min(1).default(1),
@@ -75,7 +76,8 @@ export async function getAuditLogs(
     resourceId: auth.orgId,
   });
 
-  return { logs, total, page, limit };
+  const enriched = await enrichAuditLogs(auth.orgId, tenantPrisma, logs);
+  return { logs: enriched, total, page, limit };
 }
 
 export async function getRecentActivity(auth: AuthContext, tenantPrisma: PrismaClient) {
@@ -84,5 +86,5 @@ export async function getRecentActivity(auth: AuthContext, tenantPrisma: PrismaC
     take: 50,
     orderBy: { createdAt: 'desc' },
   });
-  return recentLogs;
+  return enrichAuditLogs(auth.orgId, tenantPrisma, recentLogs);
 }
