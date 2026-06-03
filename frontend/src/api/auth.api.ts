@@ -7,7 +7,36 @@ import type {
   RegisterOrgRequest,
   User,
   MfaSetupResponse,
+  UserRole,
 } from '@/types';
+
+export interface AuthMeResponse {
+  id: string;
+  email: string;
+  role: UserRole;
+  orgId: string;
+  firstName?: string;
+  lastName?: string;
+  name?: string;
+  mfaEnabled: boolean;
+  lastLogin?: string | null;
+  createdAt?: string;
+}
+
+function mapMeToUser(data: AuthMeResponse): User {
+  return {
+    id: data.id,
+    email: data.email,
+    role: data.role,
+    orgId: data.orgId,
+    firstName: data.firstName,
+    lastName: data.lastName,
+    name: data.name,
+    mfaEnabled: data.mfaEnabled,
+    lastLogin: data.lastLogin ?? undefined,
+    createdAt: data.createdAt,
+  };
+}
 
 /** Backend login success (no MFA) */
 interface BackendTokenPair {
@@ -101,6 +130,17 @@ export const authApi = {
     await apiClient.post('/api/auth/mfa/confirm-setup', { code });
   },
 
+  getMe: async (): Promise<User> => {
+    const res = await apiClient.get('/api/auth/me');
+    return mapMeToUser(unwrap(res) as AuthMeResponse);
+  },
+
+  changePassword: async (payload: {
+    currentPassword: string;
+    newPassword: string;
+  }): Promise<void> => {
+    await apiClient.post('/api/auth/change-password', payload);
+  },
 };
 
 export const authKeys = {

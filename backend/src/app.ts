@@ -18,6 +18,7 @@ import { aiAssistantRoutes } from './modules/ai-assistant/ai-assistant.routes.js
 import { aiOutputRoutes } from './modules/ai-outputs/ai-outputs.routes.js';
 import { pdfExportRoutes } from './modules/pdf-export/pdf-export.routes.js';
 import { adminRoutes } from './modules/admin/admin.routes.js';
+import { dashboardRoutes } from './modules/dashboard/dashboard.routes.js';
 import { v4 as uuidv4 } from 'uuid';
 
 export function createApp(): express.Application {
@@ -47,6 +48,7 @@ export function createApp(): express.Application {
 
   app.use('/api/users', ...tenantMiddleware, usersRoutes);
   app.use('/api/patients', ...tenantMiddleware, patientsRoutes);
+  app.use('/api/dashboard', ...tenantMiddleware, dashboardRoutes);
   app.use('/api/appointments', ...tenantMiddleware, appointmentRoutes);
   app.use('/api/consultations', ...tenantMiddleware, consultationRoutes);
   app.use('/api/documents', ...tenantMiddleware, documentRoutes);

@@ -26,7 +26,7 @@ export const AiOutputType = {
   SOAP_NOTE: 'soap_note',
   CLINICAL_SUMMARY: 'clinical_summary',
   PATIENT_SUMMARY: 'patient_summary',
-  FOLLOWUP_INSTRUCTIONS: 'followup_instructions',
+  FOLLOWUP_INSTRUCTIONS: 'follow_up_instructions',
 } as const;
 export type AiOutputType = (typeof AiOutputType)[keyof typeof AiOutputType];
 

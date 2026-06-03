@@ -17,7 +17,10 @@ import {
   NotFoundError,
   ValidationError,
 } from '../../core/errors.js';
-import type { RegisterOrgInput, LoginInput } from './auth.schema.js';
+import type { RegisterOrgInput, LoginInput, ChangePasswordInput } from './auth.schema.js';
+import { resolveUserProfile } from './auth-profile.js';
+import type { AuthContext } from '../../types/auth.js';
+import type { PrismaClient as TenantPrisma } from '../../../node_modules/.prisma/tenant-client/index.js';
 
 const BCRYPT_ROUNDS = 12;
 const REFRESH_EXPIRY_DAYS = 7;
@@ -66,7 +69,7 @@ export async function login(input: LoginInput) {
   const valid = await bcrypt.compare(input.password, user.passwordHash);
   if (!valid) throw new AuthError('Invalid credentials');
 
-  if ((user.role === 'doctor' || user.role === 'admin') && user.mfaEnabled) {
+  if (user.mfaEnabled) {
     const tempToken = issueAccessToken({
       sub: user.id,
       orgId: user.orgId,
@@ -149,6 +152,28 @@ export async function refreshTokens(rawToken: string) {
 export async function logout(userId: string) {
   const central = getCentralPrisma();
   await repo.revokeAllUserRefreshTokens(central, userId);
+}
+
+export async function getMe(auth: AuthContext, tenantPrisma: TenantPrisma) {
+  const central = getCentralPrisma();
+  return resolveUserProfile(central, tenantPrisma, auth.userId);
+}
+
+export async function changePassword(userId: string, input: ChangePasswordInput) {
+  const central = getCentralPrisma();
+  const user = await repo.findUserById(central, userId);
+  if (!user || user.deletedAt) throw new NotFoundError('User not found');
+
+  const valid = await bcrypt.compare(input.currentPassword, user.passwordHash);
+  if (!valid) throw new AuthError('Current password is incorrect');
+
+  const sameAsOld = await bcrypt.compare(input.newPassword, user.passwordHash);
+  if (sameAsOld) throw new ValidationError('New password must be different from the current password');
+
+  const passwordHash = await bcrypt.hash(input.newPassword, BCRYPT_ROUNDS);
+  await repo.updatePasswordHash(central, userId, passwordHash);
+
+  return { success: true };
 }
 
 async function issueTokenPair(

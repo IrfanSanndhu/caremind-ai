@@ -9,17 +9,11 @@ import { AiOutputStatusBadge } from '@/components/shared/StatusBadge';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { aiOutputsApi, aiOutputKeys } from '@/api/aiOutputs.api';
 import { AiGenerationStatusBanner } from './AiGenerationStatusBanner';
-import type { AiOutput, AiOutputType } from '@/types';
+import type { AiOutput } from '@/types';
 import { UserRole } from '@/types';
 import { useAuthStore } from '@/stores/auth.store';
 import { formatDate } from '@/utils';
-
-const TYPE_LABELS: Record<AiOutputType, string> = {
-  soap_note: 'SOAP Note',
-  clinical_summary: 'Clinical Summary',
-  patient_summary: 'Patient Summary',
-  followup_instructions: 'Follow-up Instructions',
-};
+import { getAiOutputTypeLabel } from '@/utils/ai-output-labels';
 
 interface OutputCardProps {
   output: AiOutput;
@@ -80,7 +74,7 @@ function OutputCard({ output, onRefresh }: OutputCardProps) {
   return (
     <Card>
       <CardHeader
-        title={TYPE_LABELS[output.type]}
+        title={getAiOutputTypeLabel(output.type)}
         subtitle={formatDate(output.createdAt)}
         action={
           <div className="flex items-center gap-2">

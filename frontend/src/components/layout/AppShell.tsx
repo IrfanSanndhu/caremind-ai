@@ -11,12 +11,15 @@ import { NavLink, useLocation } from 'react-router-dom';
 import { cn } from '@/utils/cn';
 import { Avatar } from '@/components/ui/Avatar';
 import { LogOut } from 'lucide-react';
+import { useHydrateAuthProfile } from '@/hooks/useAuthProfile';
+import { getUserDisplayName } from '@/utils/display-name';
 
 function MobileDrawerNav() {
   const { sidebarOpen, closeMobileSidebar } = useUIStore();
   const { user, logout } = useAuthStore();
   const location = useLocation();
   const role = user?.role ?? 'patient';
+  const displayName = getUserDisplayName(user);
   const filtered = navItems.filter((item) => item.roles.includes(role));
 
   return (
@@ -49,9 +52,9 @@ function MobileDrawerNav() {
       </nav>
       <div className="mt-6 pt-6 border-t border-border">
         <div className="flex items-center gap-3 px-3">
-          <Avatar name={user?.name ?? user?.email} size="sm" />
+          <Avatar name={displayName || user?.email} size="sm" />
           <div className="flex-1 min-w-0">
-            <p className="text-sm font-medium truncate">{user?.name ?? user?.email}</p>
+            <p className="text-sm font-medium truncate">{displayName || user?.email}</p>
             <p className="text-xs text-muted capitalize">{user?.role}</p>
           </div>
           <button
@@ -70,6 +73,7 @@ function MobileDrawerNav() {
 
 export function AppShell() {
   const location = useLocation();
+  useHydrateAuthProfile();
 
   return (
     <div className="flex h-screen overflow-hidden bg-surface">

@@ -9,6 +9,7 @@ import { Button, Input, Card } from '@/components/ui';
 import { authApi } from '@/api/auth.api';
 import { getApiErrorMessage } from '@/api/errors';
 import { useAuthStore } from '@/stores/auth.store';
+import { hydrateAuthProfileAfterLogin } from '@/hooks/useAuthProfile';
 import { generateSlug } from '@/utils';
 import { cn } from '@/utils/cn';
 
@@ -95,6 +96,7 @@ export function RegisterPage() {
         adminPassword: step2Data.adminPassword,
       });
       login(res.user, res.accessToken, res.refreshToken);
+      await hydrateAuthProfileAfterLogin();
       toast.success('Organization created! Welcome to CareMind.');
       navigate('/admin/dashboard', { replace: true });
     } catch (err: unknown) {

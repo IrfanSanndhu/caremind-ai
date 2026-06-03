@@ -81,3 +81,14 @@ export async function updateLastLogin(prisma: CentralPrisma, userId: string) {
     data: { lastLoginAt: new Date() },
   });
 }
+
+export async function updatePasswordHash(
+  prisma: CentralPrisma,
+  userId: string,
+  passwordHash: string,
+) {
+  return prisma.user.update({
+    where: { id: userId },
+    data: { passwordHash },
+  });
+}

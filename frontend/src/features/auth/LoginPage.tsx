@@ -9,6 +9,7 @@ import { Button, Input } from '@/components/ui';
 import { authApi } from '@/api/auth.api';
 import { getApiErrorMessage } from '@/api/errors';
 import { useAuthStore } from '@/stores/auth.store';
+import { hydrateAuthProfileAfterLogin } from '@/hooks/useAuthProfile';
 import { UserRole } from '@/types';
 import { cn } from '@/utils/cn';
 
@@ -58,7 +59,9 @@ export function LoginPage() {
       }
       if (res.user && res.accessToken && res.refreshToken) {
         login(res.user, res.accessToken, res.refreshToken);
-        const dest = res.user.role === UserRole.ADMIN ? '/admin/dashboard' : '/dashboard';
+        await hydrateAuthProfileAfterLogin();
+        const user = useAuthStore.getState().user ?? res.user;
+        const dest = user.role === UserRole.ADMIN ? '/admin/dashboard' : '/dashboard';
         navigate(from !== '/' && from !== '/login' ? from : dest, { replace: true });
         return;
       }
@@ -76,7 +79,9 @@ export function LoginPage() {
       const res = await authApi.verifyMfa({ mfaToken, code: values.code });
       const user = { ...res.user, email: res.user.email || loginEmail };
       login(user, res.accessToken, res.refreshToken);
-      const dest = user.role === UserRole.ADMIN ? '/admin/dashboard' : '/dashboard';
+      await hydrateAuthProfileAfterLogin();
+      const hydrated = useAuthStore.getState().user ?? user;
+      const dest = hydrated.role === UserRole.ADMIN ? '/admin/dashboard' : '/dashboard';
       navigate(dest, { replace: true });
     } catch (err: unknown) {
       toast.error(getApiErrorMessage(err, 'Invalid MFA code'));

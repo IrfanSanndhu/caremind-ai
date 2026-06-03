@@ -1,5 +1,6 @@
-import { useLocation, Link } from 'react-router-dom';
-import { Menu, Bell, ChevronRight, LogOut, User, Settings } from 'lucide-react';
+import { useLocation, Link, useNavigate } from 'react-router-dom';
+import { Menu, Bell, ChevronRight, LogOut, User } from 'lucide-react';
+import { getUserDisplayName } from '@/utils/display-name';
 import { useUIStore } from '@/stores/ui.store';
 import { useAuthStore } from '@/stores/auth.store';
 import { Avatar } from '@/components/ui/Avatar';
@@ -23,6 +24,8 @@ export function Topbar() {
   const { toggleMobileSidebar } = useUIStore();
   const { user, logout } = useAuthStore();
   const location = useLocation();
+  const navigate = useNavigate();
+  const displayName = getUserDisplayName(user);
 
   const breadcrumbs = buildBreadcrumbs(location.pathname);
 
@@ -30,12 +33,7 @@ export function Topbar() {
     {
       label: 'Profile',
       icon: <User className="w-4 h-4" />,
-      onClick: () => { window.location.href = '/profile'; },
-    },
-    {
-      label: 'Settings',
-      icon: <Settings className="w-4 h-4" />,
-      onClick: () => { window.location.href = '/profile'; },
+      onClick: () => navigate('/profile'),
     },
     {
       label: 'Logout',
@@ -89,9 +87,9 @@ export function Topbar() {
               className="flex items-center gap-2 p-1.5 rounded-md hover:bg-surface transition-colors min-h-[44px]"
               aria-label="User menu"
             >
-              <Avatar name={user?.name ?? user?.email} size="sm" />
-              <span className="hidden md:block text-sm font-medium text-slate-700 max-w-[120px] truncate">
-                {user?.name ?? user?.email}
+              <Avatar name={displayName || user?.email} size="sm" />
+              <span className="hidden md:block text-sm font-medium text-slate-700 max-w-[160px] truncate">
+                {displayName || user?.email}
               </span>
             </button>
           }

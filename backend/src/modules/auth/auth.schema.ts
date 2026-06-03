@@ -29,7 +29,13 @@ export const mfaSetupVerifySchema = z.object({
   code: z.string().length(6).regex(/^\d+$/),
 });
 
+export const changePasswordSchema = z.object({
+  currentPassword: z.string().min(1, 'Current password is required'),
+  newPassword: z.string().min(8).max(128),
+});
+
 export type RegisterOrgInput = z.infer<typeof registerOrgSchema>;
 export type LoginInput = z.infer<typeof loginSchema>;
 export type RefreshTokenInput = z.infer<typeof refreshTokenSchema>;
 export type MfaVerifyInput = z.infer<typeof mfaVerifySchema>;
+export type ChangePasswordInput = z.infer<typeof changePasswordSchema>;

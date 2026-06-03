@@ -3,6 +3,7 @@ import { asyncHandler } from '../../core/async-handler.js';
 import { validate } from '../../lib/middleware/validate.middleware.js';
 import { authRateLimiter } from '../../lib/middleware/rate-limit.middleware.js';
 import { authenticate } from '../../lib/middleware/auth.middleware.js';
+import { resolveTenant } from '../../lib/middleware/tenant.middleware.js';
 import * as service from './auth.service.js';
 import {
   registerOrgSchema,
@@ -10,6 +11,7 @@ import {
   refreshTokenSchema,
   mfaVerifySchema,
   mfaSetupVerifySchema,
+  changePasswordSchema,
 } from './auth.schema.js';
 import { v4 as uuidv4 } from 'uuid';
 
@@ -60,6 +62,33 @@ authRoutes.post(
     await service.logout(req.auth.userId);
     res.json({
       data: { success: true },
+      meta: { requestId: uuidv4(), timestamp: new Date().toISOString() },
+    });
+  }),
+);
+
+authRoutes.get(
+  '/me',
+  authenticate,
+  resolveTenant,
+  asyncHandler(async (req, res) => {
+    const result = await service.getMe(req.auth, req.tenantPrisma);
+    res.json({
+      data: result,
+      meta: { requestId: uuidv4(), timestamp: new Date().toISOString() },
+    });
+  }),
+);
+
+authRoutes.post(
+  '/change-password',
+  authenticate,
+  authRateLimiter,
+  validate({ body: changePasswordSchema }),
+  asyncHandler(async (req, res) => {
+    const result = await service.changePassword(req.auth.userId, req.body);
+    res.json({
+      data: result,
       meta: { requestId: uuidv4(), timestamp: new Date().toISOString() },
     });
   }),

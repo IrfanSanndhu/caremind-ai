@@ -1,3 +1,4 @@
+import { normalizeAiOutputType } from '@/utils/ai-output-labels';
 import type {
   AiOutput,
   Appointment,
@@ -142,7 +143,7 @@ export function mapAiOutput(raw: Record<string, unknown>): AiOutput {
     appointmentId: String(raw.appointmentId),
     orgId: String(raw.orgId),
     patientId: String(raw.patientId ?? ''),
-    type: raw.type as AiOutput['type'],
+    type: normalizeAiOutputType(String(raw.type)),
     status: raw.status as AiOutput['status'],
     originalContent,
     currentContent: content,
