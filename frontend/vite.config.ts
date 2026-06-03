@@ -10,7 +10,11 @@ export default defineConfig({
     },
   },
   server: {
+    // Listen on all interfaces so ngrok / LAN devices can reach the dev server
+    host: true,
     port: 5173,
+    // Vite blocks unknown Host headers; ngrok uses *.ngrok-free.dev etc.
+    allowedHosts: ['.ngrok-free.dev', '.ngrok.io', '.ngrok.app', '.inc1.devtunnels.ms'],
     proxy: {
       '/api': {
         target: 'http://localhost:3000',
