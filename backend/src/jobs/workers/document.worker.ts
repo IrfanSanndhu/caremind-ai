@@ -5,7 +5,7 @@ import { logger } from '../../config/logger.js';
 import { getTenantPrisma } from '../../core/tenant-prisma.js';
 import { getStorageAdapter } from '../../adapters/storage/index.js';
 import { getOcrAdapter } from '../../adapters/ocr/index.js';
-import { embeddingQueue } from '../queue.js';
+import { ingestText } from '../../modules/knowledge-base/knowledge-base.service.js';
 import type { DocumentJobData } from '../queue.js';
 
 const require = createRequire(import.meta.url);
@@ -53,29 +53,59 @@ async function processDocument(data: DocumentJobData): Promise<void> {
       } else {
         extractedText = pdfText;
       }
-    } else if (document.mimeType === 'image/jpeg' || document.mimeType === 'image/png') {
-      const mimeType = document.mimeType as 'image/jpeg' | 'image/png';
-      const ocrResult = await ocr.extractText({ imageBuffer: buffer, mimeType });
+    } else if (
+      document.mimeType === 'image/jpeg' ||
+      document.mimeType === 'image/jpg' ||
+      document.mimeType === 'image/png'
+    ) {
+      const ocrMime: 'image/jpeg' | 'image/png' =
+        document.mimeType === 'image/png' ? 'image/png' : 'image/jpeg';
+      const ocrResult = await ocr.extractText({ imageBuffer: buffer, mimeType: ocrMime });
       extractedText = ocrResult.text;
     }
 
-    await tenantPrisma.document.update({
-      where: { id: documentId },
-      data: { extractedText, processingStatus: 'ready' },
-    });
-
-    if (extractedText.trim()) {
-      await embeddingQueue.add('knowledge-base.ingest', {
-        tenantDbUrl,
-        orgId,
-        patientId: document.patientId,
-        text: extractedText,
-        documentId,
-        documentType: document.documentType ?? 'document',
+    if (!extractedText.trim()) {
+      await tenantPrisma.document.update({
+        where: { id: documentId },
+        data: { extractedText: null, processingStatus: 'failed' },
       });
+      logger.warn(
+        { documentId, mimeType: document.mimeType, fileName: document.fileName, appointmentId: document.appointmentId },
+        'No text extracted from document — not vectorized',
+      );
+      return;
     }
 
-    logger.info({ documentId }, 'Document processed successfully');
+    const header = [
+      `File: ${document.fileName}`,
+      document.documentType ? `Document type: ${document.documentType}` : null,
+      document.appointmentId ? `Linked to appointment: ${document.appointmentId}` : null,
+    ]
+      .filter(Boolean)
+      .join('\n');
+
+    const textForIngest = `${header}\n\n${extractedText.trim()}`;
+
+    await ingestText({
+      tenantPrisma,
+      orgId,
+      patientId: document.patientId,
+      text: textForIngest,
+      documentId,
+      appointmentId: document.appointmentId ?? undefined,
+      documentType: document.documentType ?? 'document',
+      fileName: document.fileName,
+    });
+
+    await tenantPrisma.document.update({
+      where: { id: documentId },
+      data: { extractedText: textForIngest, processingStatus: 'ready' },
+    });
+
+    logger.info(
+      { documentId, appointmentId: document.appointmentId, fileName: document.fileName },
+      'Document processed and vectorized',
+    );
   } catch (err) {
     logger.error({ err, documentId }, 'Document processing failed');
     await tenantPrisma.document.update({

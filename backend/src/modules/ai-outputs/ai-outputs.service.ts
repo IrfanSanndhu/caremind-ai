@@ -2,7 +2,7 @@ import type { PrismaClient } from '../../../node_modules/.prisma/tenant-client/i
 import * as repo from './ai-outputs.repository.js';
 import { embeddingQueue } from '../../jobs/queue.js';
 import { getEmailAdapter } from '../../adapters/email/index.js';
-import { getCentralPrisma } from '../../core/tenant-registry.js';
+import { getCentralPrisma, getTenantDbUrl } from '../../core/tenant-registry.js';
 import { auditLog } from '../../core/audit-logger.js';
 import { ForbiddenError, NotFoundError } from '../../core/errors.js';
 import type { AuthContext } from '../../types/auth.js';
@@ -56,9 +56,9 @@ export async function approveOutput(
     reviewedAt: new Date(),
   });
 
-  // Enqueue embedding for approved content
+  const tenantDbUrl = await getTenantDbUrl(auth.orgId);
   await embeddingQueue.add('knowledge-base.ingest', {
-    tenantDbUrl: '',
+    tenantDbUrl,
     orgId: auth.orgId,
     patientId: appointment.patientId,
     text: newContent,

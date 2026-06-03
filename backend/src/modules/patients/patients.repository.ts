@@ -1,4 +1,15 @@
-import type { PrismaClient } from '../../../node_modules/.prisma/tenant-client/index.js';
+import type { Prisma, PrismaClient } from '../../../node_modules/.prisma/tenant-client/index.js';
+import { sortAppointments } from '../appointments/appointments.sort.js';
+
+function patientScopeForDoctor(doctorId: string | null): Prisma.PatientWhereInput {
+  if (!doctorId) return {};
+  return {
+    OR: [
+      { primaryDoctorId: doctorId },
+      { appointments: { some: { doctorId } } },
+    ],
+  };
+}
 
 export async function listPatients(
   prisma: PrismaClient,
@@ -10,7 +21,7 @@ export async function listPatients(
     where: {
       orgId,
       deletedAt: null,
-      ...(doctorId ? { primaryDoctorId: doctorId } : {}),
+      ...patientScopeForDoctor(doctorId),
     },
     skip: options.skip,
     take: options.take,
@@ -26,7 +37,7 @@ export async function countPatients(prisma: PrismaClient, orgId: string, doctorI
     where: {
       orgId,
       deletedAt: null,
-      ...(doctorId ? { primaryDoctorId: doctorId } : {}),
+      ...patientScopeForDoctor(doctorId),
     },
   });
 }
@@ -58,13 +69,12 @@ export async function listPatientAppointments(
   orgId: string,
   options: { skip: number; take: number },
 ) {
-  return prisma.appointment.findMany({
+  const rows = await prisma.appointment.findMany({
     where: { patientId, orgId },
-    skip: options.skip,
-    take: options.take,
-    orderBy: { scheduledAt: 'desc' },
     include: { doctor: true },
   });
+  const sorted = sortAppointments(rows);
+  return sorted.slice(options.skip, options.skip + options.take);
 }
 
 export async function countPatientAppointments(

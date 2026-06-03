@@ -27,8 +27,9 @@ export async function retrieveChunks(params: {
       ? `AND "documentType" = ANY(ARRAY[${documentTypes.map((t) => `'${t}'`).join(',')}])`
       : '';
 
+  // Appointment context: prefer that visit's records plus patient-wide ingested data (null appointmentId)
   const appointmentFilter = appointmentId
-    ? `AND "appointmentId" = '${appointmentId}'`
+    ? `AND ("appointmentId" = '${appointmentId}' OR "appointmentId" IS NULL)`
     : '';
 
   const rows = await tenantPrisma.$queryRawUnsafe<

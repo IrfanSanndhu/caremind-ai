@@ -9,6 +9,7 @@ import toast from 'react-hot-toast';
 import { Button, Card, CardHeader, Modal, ModalFooter, Skeleton } from '@/components/ui';
 import { AppointmentStatusBadge, ConsentStatusBadge } from '@/components/shared/StatusBadge';
 import { AiOutputDetailPage } from '@/features/ai-outputs/AiOutputDetailPage';
+import { AppointmentDocumentsSection } from '@/features/documents/AppointmentDocumentsSection';
 import { appointmentsApi, appointmentKeys } from '@/api/appointments.api';
 import { consultationsApi, consultationKeys } from '@/api/consultations.api';
 import { useAuthStore } from '@/stores/auth.store';
@@ -283,14 +284,11 @@ export function AppointmentDetailPage() {
         <AiOutputDetailPage appointmentId={id} embedded />
       )}
 
-      {tab === 'documents' && (
-        <Card>
-          <CardHeader title="Documents" />
-          <div className="text-center py-12">
-            <FileCheck className="w-8 h-8 text-muted mx-auto mb-3" />
-            <p className="text-muted">No documents attached to this appointment.</p>
-          </div>
-        </Card>
+      {tab === 'documents' && id && appointment.patientId && (
+        <AppointmentDocumentsSection
+          patientId={appointment.patientId}
+          appointmentId={id}
+        />
       )}
 
       {/* Cancel Confirmation Modal */}

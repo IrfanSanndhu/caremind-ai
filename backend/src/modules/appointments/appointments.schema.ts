@@ -15,10 +15,17 @@ export const consentSchema = z.object({
   consentStatus: z.enum(['accepted', 'declined']),
 });
 
+const optionalUuid = z
+  .union([z.string().uuid(), z.literal('')])
+  .optional()
+  .transform((v) => (v ? v : undefined));
+
 export const listAppointmentsSchema = z.object({
   page: z.coerce.number().min(1).default(1),
   limit: z.coerce.number().min(1).max(100).default(20),
   status: z.enum(['scheduled', 'in_progress', 'completed', 'cancelled']).optional(),
+  patientId: optionalUuid,
+  doctorId: optionalUuid,
 });
 
 export type CreateAppointmentInput = z.infer<typeof createAppointmentSchema>;

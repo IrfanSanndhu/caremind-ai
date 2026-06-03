@@ -1,4 +1,5 @@
 import type { PrismaClient } from '../../../node_modules/.prisma/tenant-client/index.js';
+import { sortAppointments } from './appointments.sort.js';
 
 export async function createAppointment(
   prisma: PrismaClient,
@@ -25,15 +26,14 @@ export async function listAppointments(
   prisma: PrismaClient,
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   where: any,
-  options: { skip: number; take: number },
+  options: { skip: number; take: number; statusFilter?: string },
 ) {
-  return prisma.appointment.findMany({
+  const rows = await prisma.appointment.findMany({
     where,
-    skip: options.skip,
-    take: options.take,
-    orderBy: { scheduledAt: 'desc' },
     include: { patient: true, doctor: true },
   });
+  const sorted = sortAppointments(rows, options.statusFilter);
+  return sorted.slice(options.skip, options.skip + options.take);
 }
 
 export async function countAppointments(

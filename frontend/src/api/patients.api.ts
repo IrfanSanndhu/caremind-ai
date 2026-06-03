@@ -51,10 +51,11 @@ function mapPatient(raw: BackendPatientsPage['patients'][number]): Patient {
 
 export const patientsApi = {
   list: async (params?: ListPatientsParams): Promise<PaginatedResponse<Patient>> => {
+    const pageSize = Math.min(params?.pageSize ?? 20, 100);
     const res = await apiClient.get('/api/patients', {
       params: listQueryParams({
         page: params?.page,
-        limit: params?.pageSize ?? 20,
+        limit: pageSize,
         doctorId: params?.doctorId,
       } as Record<string, string | number | undefined>),
     });

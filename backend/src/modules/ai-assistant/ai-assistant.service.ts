@@ -3,22 +3,12 @@ import { getAiChatAdapter } from '../../adapters/ai/index.js';
 import { getEmbeddingAdapter } from '../../adapters/embedding/index.js';
 import { retrieveChunks } from '../../core/vector-retrieval.js';
 import { auditLog } from '../../core/audit-logger.js';
-import { ForbiddenError, NotFoundError } from '../../core/errors.js';
+import { ForbiddenError } from '../../core/errors.js';
 import { buildAssistantSystemPrompt } from '../../templates/prompts/ai-assistant.prompt.js';
 import { isSafetyTrigger } from '../../templates/prompts/safety.prompt.js';
 import type { AuthContext } from '../../types/auth.js';
 import type { ChatInput } from './ai-assistant.schema.js';
-
-async function resolvePatientId(
-  auth: AuthContext,
-  tenantPrisma: PrismaClient,
-): Promise<string | null> {
-  if (auth.role === 'patient') {
-    const patient = await tenantPrisma.patient.findFirst({ where: { userId: auth.userId } });
-    return patient?.id ?? null;
-  }
-  return null;
-}
+import { assertPatientAccess, resolvePatientIdForRetrieval } from './ai-assistant.context.js';
 
 export async function chat(
   auth: AuthContext,
@@ -32,7 +22,11 @@ export async function chat(
     };
   }
 
-  const patientId = await resolvePatientId(auth, tenantPrisma);
+  const patientId = await resolvePatientIdForRetrieval(
+    auth,
+    tenantPrisma,
+    input.appointmentId,
+  );
 
   let contextChunks: string[] = [];
 
@@ -44,7 +38,7 @@ export async function chat(
       patientId,
       orgId: auth.orgId,
       appointmentId: input.appointmentId,
-      topK: 5,
+      topK: 8,
     });
     contextChunks = chunks.map((c) => c.content);
   }
@@ -86,7 +80,11 @@ export async function streamChat(
     return;
   }
 
-  const patientId = await resolvePatientId(auth, tenantPrisma);
+  const patientId = await resolvePatientIdForRetrieval(
+    auth,
+    tenantPrisma,
+    input.appointmentId,
+  );
   let contextChunks: string[] = [];
 
   if (patientId) {
@@ -97,7 +95,7 @@ export async function streamChat(
       patientId,
       orgId: auth.orgId,
       appointmentId: input.appointmentId,
-      topK: 5,
+      topK: 8,
     });
     contextChunks = chunks.map((c) => c.content);
   }
@@ -134,8 +132,7 @@ export async function doctorCopilot(
     throw new ForbiddenError('Doctor or admin role required');
   }
 
-  const patient = await tenantPrisma.patient.findUnique({ where: { id: patientId } });
-  if (!patient || patient.orgId !== auth.orgId) throw new NotFoundError('Patient not found');
+  await assertPatientAccess(auth, tenantPrisma, patientId);
 
   if (isSafetyTrigger(question)) {
     return {
@@ -150,7 +147,7 @@ export async function doctorCopilot(
     queryEmbedding: embedding,
     patientId,
     orgId: auth.orgId,
-    topK: 8,
+    topK: 12,
   });
 
   if (chunks.length === 0) {

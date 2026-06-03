@@ -28,11 +28,19 @@ appointmentRoutes.get(
   '/',
   validate({ query: listAppointmentsSchema }),
   asyncHandler(async (req, res) => {
-    const q = req.query as { page?: string; limit?: string; status?: string };
+    const q = req.query as {
+      page?: string;
+      limit?: string;
+      status?: string;
+      patientId?: string;
+      doctorId?: string;
+    };
     const result = await service.listAppointments(req.auth, req.tenantPrisma, {
       page: Number(q.page) || 1,
       limit: Number(q.limit) || 20,
       status: q.status,
+      patientId: q.patientId,
+      doctorId: q.doctorId,
     });
     res.json({
       data: result,

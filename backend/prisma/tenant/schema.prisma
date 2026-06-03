@@ -91,6 +91,7 @@ model Appointment {
   recordings ConsultationRecording[]
   transcripts Transcript[]
   aiOutputs  AiOutput[]
+  documents  Document[]
 
   @@index([orgId])
   @@index([patientId])
@@ -180,8 +181,10 @@ model Document {
   id               String                   @id @default(uuid())
   orgId            String
   patientId        String
+  appointmentId    String?
   uploadedBy       String                   // central userId
   fileName         String
+  fileSizeBytes    Int                      @default(0)
   mimeType         String
   storageBucket    String
   storageKey       String
@@ -190,11 +193,13 @@ model Document {
   documentType     String?
   createdAt        DateTime                 @default(now())
 
-  patient      Patient       @relation(fields: [patientId], references: [id])
+  patient      Patient        @relation(fields: [patientId], references: [id])
+  appointment  Appointment?   @relation(fields: [appointmentId], references: [id])
   vectorChunks VectorChunk[]
 
   @@index([orgId])
   @@index([patientId])
+  @@index([appointmentId])
   @@map("documents")
 }
 

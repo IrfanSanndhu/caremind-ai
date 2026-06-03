@@ -56,6 +56,7 @@ export function createMinioAdapter(): StorageAdapter {
     async upload({ bucket, key, body, contentType, metadata }) {
       await ensureBucketExists(client, bucket);
 
+      // MinIO (local MVP) does not support AWS SSE-KMS; omit ServerSideEncryption here.
       await client.send(
         new PutObjectCommand({
           Bucket: bucket,
@@ -63,7 +64,7 @@ export function createMinioAdapter(): StorageAdapter {
           Body: body,
           ContentType: contentType,
           Metadata: metadata,
-          ServerSideEncryption: 'AES256',
+          // ServerSideEncryption: 'AES256',
         }),
       );
 

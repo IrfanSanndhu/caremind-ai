@@ -1,14 +1,22 @@
 import { z } from 'zod';
 
+const optionalUuid = z
+  .union([z.string().uuid(), z.literal('')])
+  .optional()
+  .transform((v) => (v ? v : undefined));
+
 export const uploadDocumentSchema = z.object({
   patientId: z.string().uuid(),
+  appointmentId: optionalUuid,
   documentType: z.string().max(100).optional(),
 });
 
 export const listDocumentsSchema = z.object({
   page: z.coerce.number().min(1).default(1),
   limit: z.coerce.number().min(1).max(100).default(20),
-  patientId: z.string().uuid().optional(),
+  patientId: optionalUuid,
+  doctorId: optionalUuid,
+  appointmentId: optionalUuid,
 });
 
 export const ALLOWED_MIME_TYPES = [

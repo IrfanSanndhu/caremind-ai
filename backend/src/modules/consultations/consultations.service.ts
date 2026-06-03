@@ -2,7 +2,7 @@ import { v4 as uuidv4 } from 'uuid';
 import type { PrismaClient } from '../../../node_modules/.prisma/tenant-client/index.js';
 import * as repo from './consultations.repository.js';
 import { env } from '../../config/env.js';
-import { getCentralPrisma } from '../../core/tenant-registry.js';
+import { getCentralPrisma, getTenantDbUrl } from '../../core/tenant-registry.js';
 import { getLiveKitAdapter } from '../../adapters/livekit/index.js';
 import { transcriptionQueue } from '../../jobs/queue.js';
 import { auditLog } from '../../core/audit-logger.js';
@@ -150,8 +150,9 @@ export async function stopRecording(
 
   await repo.updateRecordingStatus(tenantPrisma, recording.id, 'uploaded');
 
+  const tenantDbUrl = await getTenantDbUrl(auth.orgId);
   await transcriptionQueue.add('consultation.transcribe', {
-    tenantDbUrl: '',
+    tenantDbUrl,
     orgId: auth.orgId,
     recordingId: recording.id,
     appointmentId,

@@ -29,9 +29,13 @@ export const aiApi = {
   },
 
   /** GET /api/ai/doctor-copilot/:patientId?q=... */
-  doctorCopilot: async (params: { patientId: string; q: string }): Promise<{ response: string; escalated: boolean }> => {
+  doctorCopilot: async (
+    params: { patientId: string; q: string },
+    signal?: AbortSignal,
+  ): Promise<{ response: string; escalated: boolean }> => {
     const res = await apiClient.get(`/api/ai/doctor-copilot/${params.patientId}`, {
       params: { q: params.q },
+      signal,
     });
     return unwrap(res);
   },
@@ -41,7 +45,8 @@ export const aiApi = {
     onChunk: (chunk: string) => void,
     onDone: (escalated: boolean) => void,
     onError: (error: string) => void,
-    signal?: AbortSignal
+    signal?: AbortSignal,
+    onAbort?: () => void,
   ): void => {
     const params = new URLSearchParams();
     if (payload.appointmentId) params.set('appointmentId', payload.appointmentId);
@@ -98,8 +103,14 @@ export const aiApi = {
         onDone(escalated);
       })
       .catch((err: unknown) => {
-        if (err instanceof Error && err.name !== 'AbortError') {
+        if (err instanceof Error && err.name === 'AbortError') {
+          onAbort?.();
+          return;
+        }
+        if (err instanceof Error) {
           onError(err.message);
+        } else {
+          onError('Request failed');
         }
       });
   },

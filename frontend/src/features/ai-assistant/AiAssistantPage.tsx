@@ -1,15 +1,17 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { Send, AlertTriangle, BrainCircuit, Stethoscope, RotateCcw } from 'lucide-react';
+import { Send, Square, AlertTriangle, BrainCircuit, Stethoscope, RotateCcw } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Select, Avatar } from '@/components/ui';
+import { MarkdownContent } from '@/components/shared/MarkdownContent';
 import { aiApi } from '@/api/ai.api';
 import { appointmentsApi, appointmentKeys } from '@/api/appointments.api';
 import { useAuthStore } from '@/stores/auth.store';
 import { UserRole } from '@/types';
-import { formatTime } from '@/utils/formatDate';
+import { formatDateTime } from '@/utils/formatDate';
 import { cn } from '@/utils/cn';
 import type { ChatMessage } from '@/types';
+import { AiAssistantMessageBubble } from './AiAssistantMessageBubble';
 
 function TypingIndicator() {
   return (
@@ -26,39 +28,6 @@ function TypingIndicator() {
   );
 }
 
-function MessageBubble({ message }: { message: ChatMessage }) {
-  const isUser = message.role === 'user';
-  return (
-    <motion.div
-      initial={{ opacity: 0, y: 8 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.2 }}
-      className={cn('flex gap-3', isUser && 'flex-row-reverse')}
-    >
-      <Avatar
-        name={isUser ? 'You' : 'AI'}
-        size="sm"
-        className={cn(!isUser && 'bg-primary-100 text-primary')}
-      />
-      <div className={cn('max-w-[80%] space-y-1', isUser && 'items-end flex flex-col')}>
-        <div
-          className={cn(
-            'px-4 py-3 rounded-xl text-sm leading-relaxed',
-            isUser
-              ? 'bg-primary text-white rounded-tr-sm'
-              : 'bg-white border border-border text-slate-800 rounded-tl-sm shadow-card'
-          )}
-        >
-          {message.content}
-        </div>
-        <span className="text-xs text-muted px-1">
-          {formatTime(message.timestamp)}
-        </span>
-      </div>
-    </motion.div>
-  );
-}
-
 export function AiAssistantPage() {
   const { role } = useAuthStore();
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -72,6 +41,8 @@ export function AiAssistantPage() {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
+  const streamContentRef = useRef('');
+  const stoppedByUserRef = useRef(false);
 
   const { data: appointments } = useQuery({
     queryKey: appointmentKeys.lists(),
@@ -92,9 +63,36 @@ export function AiAssistantPage() {
     }
   };
 
+  const finalizeStream = useCallback((content: string, isEscalated = false) => {
+    const trimmed = content.trim();
+    if (trimmed) {
+      const aiMsg: ChatMessage = {
+        id: crypto.randomUUID(),
+        role: 'assistant',
+        content: trimmed,
+        timestamp: new Date().toISOString(),
+        escalated: isEscalated,
+      };
+      setMessages((prev) => [...prev, aiMsg]);
+    }
+    setIsStreaming(false);
+    setStreamingContent('');
+    streamContentRef.current = '';
+  }, []);
+
+  const stopGeneration = useCallback(() => {
+    stoppedByUserRef.current = true;
+    abortControllerRef.current?.abort();
+    abortControllerRef.current = null;
+    finalizeStream(streamContentRef.current);
+  }, [finalizeStream]);
+
   const sendMessage = useCallback(() => {
     const text = input.trim();
     if (!text || isStreaming) return;
+
+    stoppedByUserRef.current = false;
+    streamContentRef.current = '';
 
     const userMsg: ChatMessage = {
       id: crypto.randomUUID(),
@@ -126,8 +124,12 @@ export function AiAssistantPage() {
       }
 
       aiApi
-        .doctorCopilot({ patientId: selectedPatientId, q: text })
+        .doctorCopilot(
+          { patientId: selectedPatientId, q: text },
+          abortControllerRef.current.signal,
+        )
         .then((res) => {
+          if (stoppedByUserRef.current) return;
           if (res.escalated) setEscalated(true);
           const aiMsg: ChatMessage = {
             id: crypto.randomUUID(),
@@ -139,6 +141,11 @@ export function AiAssistantPage() {
           setMessages((prev) => [...prev, aiMsg]);
         })
         .catch((err: unknown) => {
+          if (stoppedByUserRef.current) return;
+          const isCanceled =
+            (err instanceof Error && err.name === 'CanceledError') ||
+            (typeof err === 'object' && err !== null && 'code' in err && err.code === 'ERR_CANCELED');
+          if (isCanceled) return;
           const msg = err instanceof Error ? err.message : String(err);
           const errMsg: ChatMessage = {
             id: crypto.randomUUID(),
@@ -149,14 +156,14 @@ export function AiAssistantPage() {
           setMessages((prev) => [...prev, errMsg]);
         })
         .finally(() => {
-          setIsStreaming(false);
-          setStreamingContent('');
+          if (!stoppedByUserRef.current) {
+            setIsStreaming(false);
+            setStreamingContent('');
+          }
         });
 
       return;
     }
-
-    let accumulatedContent = '';
 
     aiApi.streamChat(
       {
@@ -164,25 +171,19 @@ export function AiAssistantPage() {
         appointmentId: selectedAppointmentId || undefined,
       },
       (chunk) => {
-        accumulatedContent += chunk;
-        setStreamingContent(accumulatedContent);
+        streamContentRef.current += chunk;
+        setStreamingContent(streamContentRef.current);
       },
       (isEscalated) => {
-        setIsStreaming(false);
-        setStreamingContent('');
+        if (stoppedByUserRef.current) return;
         if (isEscalated) setEscalated(true);
-        const aiMsg: ChatMessage = {
-          id: crypto.randomUUID(),
-          role: 'assistant',
-          content: accumulatedContent,
-          timestamp: new Date().toISOString(),
-          escalated: isEscalated,
-        };
-        setMessages((prev) => [...prev, aiMsg]);
+        finalizeStream(streamContentRef.current, isEscalated);
       },
       (error) => {
+        if (stoppedByUserRef.current) return;
         setIsStreaming(false);
         setStreamingContent('');
+        streamContentRef.current = '';
         const errMsg: ChatMessage = {
           id: crypto.randomUUID(),
           role: 'assistant',
@@ -191,18 +192,31 @@ export function AiAssistantPage() {
         };
         setMessages((prev) => [...prev, errMsg]);
       },
-      abortControllerRef.current.signal
+      abortControllerRef.current.signal,
+      () => {
+        if (stoppedByUserRef.current) return;
+        finalizeStream(streamContentRef.current);
+      },
     );
-  }, [input, isStreaming, selectedAppointmentId, isDoctorMode, selectedPatientId]);
+  }, [
+    input,
+    isStreaming,
+    selectedAppointmentId,
+    isDoctorMode,
+    selectedPatientId,
+    finalizeStream,
+  ]);
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
-      sendMessage();
+      if (isStreaming) stopGeneration();
+      else sendMessage();
     }
   };
 
   const clearChat = () => {
+    stoppedByUserRef.current = true;
     abortControllerRef.current?.abort();
     setMessages([]);
     setStreamingContent('');
@@ -212,7 +226,7 @@ export function AiAssistantPage() {
 
   const appointmentOptions = appointments?.items.map((a) => ({
     value: a.id,
-    label: `${a.patient?.firstName} ${a.patient?.lastName} — ${new Date(a.scheduledAt).toLocaleDateString()}`,
+    label: `${a.patient?.firstName ?? ''} ${a.patient?.lastName ?? ''} — ${formatDateTime(a.scheduledAt)}`.trim(),
   })) ?? [];
 
   const patientOptions =
@@ -334,7 +348,7 @@ export function AiAssistantPage() {
         )}
 
         {messages.map((msg) => (
-          <MessageBubble key={msg.id} message={msg} />
+          <AiAssistantMessageBubble key={msg.id} message={msg} />
         ))}
 
         {isStreaming && (
@@ -342,7 +356,11 @@ export function AiAssistantPage() {
             <Avatar name="AI" size="sm" className="bg-primary-100 text-primary" />
             <div className="max-w-[80%]">
               <div className="bg-white border border-border rounded-xl rounded-tl-sm shadow-card px-4 py-3 text-sm leading-relaxed text-slate-800">
-                {streamingContent || <TypingIndicator />}
+                {streamingContent ? (
+                  <MarkdownContent content={streamingContent} />
+                ) : (
+                  <TypingIndicator />
+                )}
               </div>
             </div>
           </div>
@@ -361,27 +379,39 @@ export function AiAssistantPage() {
             onKeyDown={handleKeyDown}
             placeholder={isDoctorMode ? 'Ask your clinical question...' : 'Type a message...'}
             rows={1}
-            disabled={isStreaming}
-            className="flex-1 bg-transparent resize-none outline-none text-base text-slate-900 placeholder:text-muted leading-relaxed max-h-[120px] min-h-[24px]"
+            className="flex-1 bg-transparent resize-none outline-none text-base text-slate-900 placeholder:text-muted leading-relaxed max-h-[120px] min-h-[24px] disabled:opacity-60"
             aria-label="Message input"
           />
-          <button
-            type="button"
-            onClick={sendMessage}
-            disabled={!input.trim() || isStreaming}
-            className={cn(
-              'w-9 h-9 rounded-lg flex items-center justify-center transition-all flex-shrink-0',
-              input.trim() && !isStreaming
-                ? 'bg-primary text-white hover:bg-primary-dark active:scale-95'
-                : 'bg-border text-muted cursor-not-allowed'
-            )}
-            aria-label="Send message"
-          >
-            <Send className="w-4 h-4" />
-          </button>
+          {isStreaming ? (
+            <button
+              type="button"
+              onClick={stopGeneration}
+              className="w-9 h-9 rounded-lg flex items-center justify-center transition-all flex-shrink-0 bg-slate-800 text-white hover:bg-slate-900 active:scale-95"
+              aria-label="Stop generating"
+            >
+              <Square className="w-4 h-4 fill-current" />
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={sendMessage}
+              disabled={!input.trim()}
+              className={cn(
+                'w-9 h-9 rounded-lg flex items-center justify-center transition-all flex-shrink-0',
+                input.trim()
+                  ? 'bg-primary text-white hover:bg-primary-dark active:scale-95'
+                  : 'bg-border text-muted cursor-not-allowed'
+              )}
+              aria-label="Send message"
+            >
+              <Send className="w-4 h-4" />
+            </button>
+          )}
         </div>
         <p className="text-xs text-muted mt-2 text-center">
-          Enter to send · Shift+Enter for new line · AI responses may not be medically accurate
+          Enter to send · Shift+Enter for new line
+          {isStreaming ? ' · Enter or Stop to cancel' : ''}
+          {' · '}AI responses may not be medically accurate
         </p>
       </div>
     </div>

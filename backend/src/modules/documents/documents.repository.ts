@@ -1,4 +1,13 @@
+import { Prisma } from '../../../node_modules/.prisma/tenant-client/index.js';
 import type { PrismaClient } from '../../../node_modules/.prisma/tenant-client/index.js';
+
+export const documentListArgs = Prisma.validator<Prisma.DocumentDefaultArgs>()({
+  include: {
+    appointment: { select: { id: true, scheduledAt: true } },
+  },
+});
+
+export type DocumentListRow = Prisma.DocumentGetPayload<typeof documentListArgs>;
 
 export async function createDocument(
   prisma: PrismaClient,
@@ -8,10 +17,12 @@ export async function createDocument(
     patientId: string;
     uploadedBy: string;
     fileName: string;
+    fileSizeBytes: number;
     mimeType: string;
     storageBucket: string;
     storageKey: string;
     documentType?: string;
+    appointmentId?: string | null;
   },
 ) {
   return prisma.document.create({ data });
@@ -26,12 +37,13 @@ export async function listDocuments(
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   where: any,
   options: { skip: number; take: number },
-) {
+): Promise<DocumentListRow[]> {
   return prisma.document.findMany({
     where,
     skip: options.skip,
     take: options.take,
     orderBy: { createdAt: 'desc' },
+    ...documentListArgs,
   });
 }
 

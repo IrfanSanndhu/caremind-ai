@@ -5,11 +5,51 @@ import * as repo from './documents.repository.js';
 import { getStorageAdapter } from '../../adapters/storage/index.js';
 import { documentQueue } from '../../jobs/queue.js';
 import { auditLog } from '../../core/audit-logger.js';
+import { getTenantDbUrl } from '../../core/tenant-registry.js';
 import { ForbiddenError, NotFoundError, ValidationError } from '../../core/errors.js';
 import type { AuthContext } from '../../types/auth.js';
 import { ALLOWED_MIME_TYPES, type UploadDocumentInput } from './documents.schema.js';
 
 const MAX_FILE_SIZE_BYTES = 20 * 1024 * 1024;
+
+type LinkedAppointment = { id: string; scheduledAt: Date };
+
+function fileSizeBytesOf(doc: unknown): number {
+  if (typeof doc === 'object' && doc !== null && 'fileSizeBytes' in doc) {
+    const bytes = (doc as { fileSizeBytes: unknown }).fileSizeBytes;
+    return typeof bytes === 'number' ? bytes : 0;
+  }
+  return 0;
+}
+
+function serializeDocument(doc: repo.DocumentListRow) {
+  const linked = doc.appointment as LinkedAppointment | null;
+  return {
+    ...doc,
+    fileSize: fileSizeBytesOf(doc),
+    createdAt: doc.createdAt.toISOString(),
+    appointment: linked
+      ? {
+          id: linked.id,
+          scheduledAt: linked.scheduledAt.toISOString(),
+        }
+      : null,
+  };
+}
+
+async function assertAppointmentForPatient(
+  tenantPrisma: PrismaClient,
+  orgId: string,
+  patientId: string,
+  appointmentId: string,
+) {
+  const appointment = await tenantPrisma.appointment.findFirst({
+    where: { id: appointmentId, orgId, patientId },
+  });
+  if (!appointment) {
+    throw new ValidationError('Appointment not found for this patient');
+  }
+}
 
 export async function uploadDocument(
   auth: AuthContext,
@@ -24,6 +64,22 @@ export async function uploadDocument(
   const detectedMime = file.mimetype as string;
   if (!(ALLOWED_MIME_TYPES as readonly string[]).includes(detectedMime)) {
     throw new ValidationError(`Unsupported file type: ${detectedMime}`);
+  }
+
+  if (auth.role === 'patient') {
+    const patient = await repo.findPatientByUserId(tenantPrisma, auth.userId);
+    if (!patient || patient.id !== input.patientId) {
+      throw new ForbiddenError('Access denied');
+    }
+  }
+
+  if (input.appointmentId) {
+    await assertAppointmentForPatient(
+      tenantPrisma,
+      auth.orgId,
+      input.patientId,
+      input.appointmentId,
+    );
   }
 
   const orgSlug = auth.orgId.replace(/-/g, '').slice(0, 12);
@@ -42,6 +98,7 @@ export async function uploadDocument(
       orgId: auth.orgId,
       patientId: input.patientId,
       uploadedBy: auth.userId,
+      ...(input.appointmentId && { appointmentId: input.appointmentId }),
     },
   });
 
@@ -49,16 +106,19 @@ export async function uploadDocument(
     id: documentId,
     orgId: auth.orgId,
     patientId: input.patientId,
+    appointmentId: input.appointmentId ?? null,
     uploadedBy: auth.userId,
     fileName: file.originalname,
+    fileSizeBytes: file.size,
     mimeType: detectedMime,
     storageBucket: bucket,
     storageKey,
     documentType: input.documentType,
   });
 
+  const tenantDbUrl = await getTenantDbUrl(auth.orgId);
   await documentQueue.add('document.process', {
-    tenantDbUrl: '',
+    tenantDbUrl,
     orgId: auth.orgId,
     documentId,
   });
@@ -70,15 +130,30 @@ export async function uploadDocument(
     action: 'UPLOAD_DOCUMENT',
     resourceType: 'Document',
     resourceId: documentId,
+    metadata: {
+      patientId: input.patientId,
+      ...(input.appointmentId && { appointmentId: input.appointmentId }),
+    },
   });
 
-  return document;
+  return {
+    ...document,
+    fileSize: fileSizeBytesOf(document),
+    createdAt: document.createdAt.toISOString(),
+    appointment: null,
+  };
 }
 
 export async function listDocuments(
   auth: AuthContext,
   tenantPrisma: PrismaClient,
-  options: { page: number; limit: number; patientId?: string },
+  options: {
+    page: number;
+    limit: number;
+    patientId?: string;
+    doctorId?: string;
+    appointmentId?: string;
+  },
 ) {
   const skip = (options.page - 1) * options.limit;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -86,9 +161,30 @@ export async function listDocuments(
 
   if (auth.role === 'patient') {
     const patient = await repo.findPatientByUserId(tenantPrisma, auth.userId);
-    if (patient) where['patientId'] = patient.id;
-  } else if (options.patientId) {
+    if (!patient) {
+      return { documents: [], total: 0, page: options.page, limit: options.limit };
+    }
+    where['patientId'] = patient.id;
+    if (!options.doctorId) {
+      return { documents: [], total: 0, page: options.page, limit: options.limit };
+    }
+  } else {
+    if (!options.patientId) {
+      return { documents: [], total: 0, page: options.page, limit: options.limit };
+    }
     where['patientId'] = options.patientId;
+  }
+
+  if (options.appointmentId) {
+    where['OR'] = [
+      { appointmentId: options.appointmentId },
+      { appointmentId: null },
+    ];
+  } else if (options.doctorId) {
+    where['OR'] = [
+      { appointment: { doctorId: options.doctorId } },
+      { appointmentId: null },
+    ];
   }
 
   const [documents, total] = await Promise.all([
@@ -96,7 +192,12 @@ export async function listDocuments(
     repo.countDocuments(tenantPrisma, where),
   ]);
 
-  return { documents, total, page: options.page, limit: options.limit };
+  return {
+    documents: documents.map(serializeDocument),
+    total,
+    page: options.page,
+    limit: options.limit,
+  };
 }
 
 export async function getDocument(
@@ -123,7 +224,44 @@ export async function getDocument(
     resourceId: documentId,
   });
 
-  return document;
+  return {
+    ...document,
+    fileSize: fileSizeBytesOf(document),
+    createdAt: document.createdAt.toISOString(),
+  };
+}
+
+export async function reprocessDocument(
+  auth: AuthContext,
+  tenantPrisma: PrismaClient,
+  documentId: string,
+) {
+  const document = await repo.findDocumentById(tenantPrisma, documentId);
+  if (!document || document.orgId !== auth.orgId) throw new NotFoundError('Document not found');
+
+  await tenantPrisma.document.update({
+    where: { id: documentId },
+    data: { processingStatus: 'pending', extractedText: null },
+  });
+
+  const tenantDbUrl = await getTenantDbUrl(auth.orgId);
+  await documentQueue.add('document.process', {
+    tenantDbUrl,
+    orgId: auth.orgId,
+    documentId,
+  });
+
+  await auditLog({
+    tenantPrisma,
+    userId: auth.userId,
+    orgId: auth.orgId,
+    action: 'UPLOAD_DOCUMENT',
+    resourceType: 'Document',
+    resourceId: documentId,
+    metadata: { reprocess: true },
+  });
+
+  return { id: documentId, processingStatus: 'pending' as const };
 }
 
 export async function deleteDocument(

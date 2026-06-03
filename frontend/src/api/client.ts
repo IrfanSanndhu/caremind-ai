@@ -44,6 +44,9 @@ function addRefreshSubscriber(cb: (token: string) => void): void {
 
 apiClient.interceptors.request.use(
   (config: InternalAxiosRequestConfig) => {
+    if (config.data instanceof FormData) {
+      delete config.headers['Content-Type'];
+    }
     const store = getAuthStore?.();
     if (store?.accessToken) {
       config.headers.Authorization = `Bearer ${store.accessToken}`;

@@ -162,10 +162,16 @@ export interface AiOutput {
   updatedAt: string;
 }
 
+export interface DocumentAppointmentRef {
+  id: string;
+  scheduledAt: string;
+}
+
 export interface Document {
   id: string;
   orgId: string;
   patientId: string;
+  appointmentId?: string | null;
   uploadedBy: string;
   fileName: string;
   fileType: string;
@@ -178,6 +184,7 @@ export interface Document {
   createdAt: string;
   updatedAt: string;
   patient?: Patient;
+  appointment?: DocumentAppointmentRef | null;
   signedUrl?: string;
 }
 

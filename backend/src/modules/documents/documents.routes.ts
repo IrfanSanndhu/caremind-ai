@@ -36,12 +36,35 @@ documentRoutes.get(
   '/',
   validate({ query: listDocumentsSchema }),
   asyncHandler(async (req, res) => {
-    const q = req.query as { page?: string; limit?: string; patientId?: string };
+    const q = req.query as {
+      page?: string;
+      limit?: string;
+      patientId?: string;
+      doctorId?: string;
+      appointmentId?: string;
+    };
     const result = await service.listDocuments(req.auth, req.tenantPrisma, {
       page: Number(q.page) || 1,
       limit: Number(q.limit) || 20,
       patientId: q.patientId,
+      doctorId: q.doctorId,
+      appointmentId: q.appointmentId,
     });
+    res.json({
+      data: result,
+      meta: { requestId: uuidv4(), timestamp: new Date().toISOString() },
+    });
+  }),
+);
+
+documentRoutes.post(
+  '/:id/reprocess',
+  asyncHandler(async (req, res) => {
+    const result = await service.reprocessDocument(
+      req.auth,
+      req.tenantPrisma,
+      req.params['id']!,
+    );
     res.json({
       data: result,
       meta: { requestId: uuidv4(), timestamp: new Date().toISOString() },

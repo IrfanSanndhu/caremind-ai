@@ -38,7 +38,7 @@ export function buildAssistantSystemPrompt(
     const joinedChunks = context.contextChunks
       .map((c, i) => `[Context ${i + 1}]\n${c}`)
       .join('\n\n');
-    contextSection = `\n\nRELEVANT PATIENT CONTEXT (retrieved from records):\n${joinedChunks}\n\nUse this context to inform your response, but do not repeat it verbatim.`;
+    contextSection = `\n\nRELEVANT PATIENT CONTEXT (retrieved from uploaded documents, lab reports, transcripts, and approved notes):\n${joinedChunks}\n\nChunks may begin with "File:" — that is the uploaded document name. Use this context to inform your response. If the user asks about a named file, check whether it appears in the context before saying it is missing.`;
   }
 
   return `${baseInstruction}${SAFETY_GUARDRAILS}${contextSection}`;

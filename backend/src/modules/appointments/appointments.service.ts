@@ -61,7 +61,7 @@ export async function createAppointment(
 export async function listAppointments(
   auth: AuthContext,
   tenantPrisma: PrismaClient,
-  options: { page: number; limit: number; status?: string },
+  options: { page: number; limit: number; status?: string; patientId?: string; doctorId?: string },
 ) {
   const { role, orgId } = auth;
   const skip = (options.page - 1) * options.limit;
@@ -74,13 +74,22 @@ export async function listAppointments(
   if (role === 'patient') {
     const patient = await repo.findPatientByUserId(tenantPrisma, auth.userId);
     if (patient) where['patientId'] = patient.id;
+    if (options.doctorId) where['doctorId'] = options.doctorId;
   } else if (role === 'doctor') {
     const doctor = await repo.findDoctorByUserId(tenantPrisma, auth.userId);
     if (doctor) where['doctorId'] = doctor.id;
+    if (options.patientId) where['patientId'] = options.patientId;
+  } else {
+    if (options.patientId) where['patientId'] = options.patientId;
+    if (options.doctorId) where['doctorId'] = options.doctorId;
   }
 
   const [appointments, total] = await Promise.all([
-    repo.listAppointments(tenantPrisma, where, { skip, take: options.limit }),
+    repo.listAppointments(tenantPrisma, where, {
+      skip,
+      take: options.limit,
+      statusFilter: options.status,
+    }),
     repo.countAppointments(tenantPrisma, where),
   ]);
 

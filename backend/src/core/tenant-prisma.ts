@@ -1,6 +1,7 @@
 import { PrismaClient } from '../../node_modules/.prisma/tenant-client/index.js';
 import { env } from '../config/env.js';
 import { logger } from '../config/logger.js';
+import { TenantError } from './errors.js';
 
 const MAX_CLIENTS_PER_TENANT = 10;
 
@@ -12,6 +13,10 @@ interface PoolEntry {
 const pool = new Map<string, PoolEntry>();
 
 export function getTenantPrisma(dbUrl: string): PrismaClient {
+  if (!dbUrl?.trim()) {
+    throw new TenantError('Tenant database URL is required for background jobs');
+  }
+
   const existing = pool.get(dbUrl);
 
   if (existing) {

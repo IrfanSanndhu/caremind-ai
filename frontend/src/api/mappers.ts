@@ -162,11 +162,24 @@ export function mapAiOutput(raw: Record<string, unknown>): AiOutput {
   };
 }
 
+function toIsoTimestamp(value: unknown, fallback?: string): string {
+  if (typeof value === 'string' && value) return value;
+  if (value instanceof Date) return value.toISOString();
+  if (value != null) {
+    const parsed = new Date(value as string | number);
+    if (!Number.isNaN(parsed.getTime())) return parsed.toISOString();
+  }
+  return fallback ?? new Date().toISOString();
+}
+
 export function mapDocument(raw: Record<string, unknown>): Document {
+  const createdAt = toIsoTimestamp(raw.createdAt);
+  const appt = raw.appointment as Record<string, unknown> | null | undefined;
   return {
     id: String(raw.id),
     orgId: String(raw.orgId),
     patientId: String(raw.patientId),
+    appointmentId: raw.appointmentId != null ? String(raw.appointmentId) : null,
     uploadedBy: String(raw.uploadedBy),
     fileName: String(raw.fileName),
     fileType: String(raw.mimeType ?? raw.fileType ?? ''),
@@ -175,13 +188,13 @@ export function mapDocument(raw: Record<string, unknown>): Document {
     storagePath: String(raw.storageKey ?? raw.storagePath ?? ''),
     processingStatus: (raw.processingStatus ?? raw.status ?? 'pending') as Document['processingStatus'],
     documentType: raw.documentType ? String(raw.documentType) : undefined,
-    createdAt:
-      typeof raw.createdAt === 'string'
-        ? raw.createdAt
-        : (raw.createdAt as Date).toISOString(),
-    updatedAt:
-      typeof raw.updatedAt === 'string'
-        ? raw.updatedAt
-        : (raw.updatedAt as Date).toISOString(),
+    createdAt,
+    updatedAt: toIsoTimestamp(raw.updatedAt, createdAt),
+    appointment: appt
+      ? {
+          id: String(appt.id),
+          scheduledAt: toIsoTimestamp(appt.scheduledAt),
+        }
+      : null,
   };
 }

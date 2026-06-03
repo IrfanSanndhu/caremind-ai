@@ -35,10 +35,16 @@ export async function ingestText(params: {
   documentId?: string;
   appointmentId?: string;
   documentType: string;
+  fileName?: string;
 }): Promise<void> {
-  const { tenantPrisma, orgId, patientId, text, documentId, appointmentId, documentType } = params;
+  const { tenantPrisma, orgId, patientId, text, documentId, appointmentId, documentType, fileName } =
+    params;
 
   if (!text.trim()) return;
+
+  if (documentId) {
+    await tenantPrisma.vectorChunk.deleteMany({ where: { documentId } });
+  }
 
   const chunks = chunkText(text);
   if (chunks.length === 0) return;
@@ -54,7 +60,13 @@ export async function ingestText(params: {
     appointmentId: appointmentId ?? null,
     documentType,
     content,
-    metadata: { chunkIndex: i, totalChunks: chunks.length },
+    metadata: {
+      chunkIndex: i,
+      totalChunks: chunks.length,
+      ...(fileName ? { fileName } : {}),
+      ...(appointmentId ? { appointmentId } : {}),
+      ...(documentId ? { documentId } : {}),
+    },
   }));
 
   // Insert in batches to avoid exceeding query size limits

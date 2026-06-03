@@ -10,6 +10,8 @@ export interface CreateAppointmentPayload {
 
 export interface ListAppointmentsParams {
   status?: AppointmentStatus;
+  patientId?: string;
+  doctorId?: string;
   page?: number;
   pageSize?: number;
 }
