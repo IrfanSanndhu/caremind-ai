@@ -60,6 +60,9 @@ export interface User {
   mfaEnabled?: boolean;
   lastLogin?: string;
   createdAt?: string;
+  patientProfileId?: string;
+  primaryDoctorId?: string | null;
+  primaryDoctorName?: string | null;
 }
 
 export interface AuthContext {

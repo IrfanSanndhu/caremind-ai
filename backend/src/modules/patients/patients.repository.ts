@@ -40,6 +40,18 @@ export async function findPatientById(prisma: PrismaClient, id: string) {
   });
 }
 
+export async function updatePatientPrimaryDoctor(
+  prisma: PrismaClient,
+  patientId: string,
+  orgId: string,
+  doctorId: string,
+) {
+  return prisma.patient.updateMany({
+    where: { id: patientId, orgId, deletedAt: null },
+    data: { primaryDoctorId: doctorId },
+  });
+}
+
 export async function listPatientAppointments(
   prisma: PrismaClient,
   patientId: string,

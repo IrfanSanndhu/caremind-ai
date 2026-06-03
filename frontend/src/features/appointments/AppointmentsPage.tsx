@@ -2,12 +2,9 @@ import { useMemo, useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import { Plus, Search, Calendar, Video } from 'lucide-react';
-import { useForm } from 'react-hook-form';
-import { zodResolver } from '@hookform/resolvers/zod';
-import { z } from 'zod';
 import toast from 'react-hot-toast';
 import {
-  Button, Card, Input, Select, Modal, ModalFooter,
+  Button, Card, Input,
   Pagination, EmptyState, Skeleton,
 } from '@/components/ui';
 import { PageHeader } from '@/components/layout/PageHeader';
@@ -19,13 +16,7 @@ import { useAuthStore } from '@/stores/auth.store';
 import { AppointmentStatus, UserRole } from '@/types';
 import { formatDateTime } from '@/utils/formatDate';
 import { cn } from '@/utils/cn';
-
-const createSchema = z.object({
-  patientId: z.string().min(1, 'Select a patient'),
-  doctorId: z.string().min(1, 'Select a doctor'),
-  scheduledAt: z.string().min(1, 'Select date and time'),
-});
-type CreateFormValues = z.infer<typeof createSchema>;
+import { ScheduleAppointmentModal } from './ScheduleAppointmentModal';
 
 const STATUS_TABS: { label: string; value: AppointmentStatus | 'all' }[] = [
   { label: 'All', value: 'all' },
@@ -67,44 +58,6 @@ export function AppointmentsPage() {
       return patient.includes(searchLower) || doctor.includes(searchLower);
     });
   }, [data?.items, searchLower]);
-
-  const participantOptions = useMemo(() => {
-    const doctors = new Map<string, string>();
-    const patients = new Map<string, string>();
-    for (const appt of data?.items ?? []) {
-      if (appt.doctor) {
-        doctors.set(
-          appt.doctorId,
-          `Dr. ${appt.doctor.firstName} ${appt.doctor.lastName}`
-        );
-      }
-      if (appt.patient) {
-        patients.set(
-          appt.patientId,
-          `${appt.patient.firstName} ${appt.patient.lastName}`
-        );
-      }
-    }
-    return {
-      doctors: Array.from(doctors, ([value, label]) => ({ value, label })),
-      patients: Array.from(patients, ([value, label]) => ({ value, label })),
-    };
-  }, [data?.items]);
-
-  const { register, handleSubmit, reset, formState: { errors } } = useForm<CreateFormValues>({
-    resolver: zodResolver(createSchema),
-  });
-
-  const createMutation = useMutation({
-    mutationFn: appointmentsApi.create,
-    onSuccess: () => {
-      toast.success('Appointment scheduled!');
-      setCreateOpen(false);
-      reset();
-      queryClient.invalidateQueries({ queryKey: appointmentKeys.all });
-    },
-    onError: () => toast.error('Failed to schedule appointment'),
-  });
 
   const updateStatusMutation = useMutation({
     mutationFn: (params: { id: string; status: AppointmentStatus }) =>
@@ -407,62 +360,11 @@ export function AppointmentsPage() {
       )}
 
       {/* Create Modal */}
-      <Modal open={createOpen} onClose={() => { setCreateOpen(false); reset(); }} title="Schedule Appointment">
-        <form
-          onSubmit={handleSubmit((d) =>
-            createMutation.mutate({
-              ...d,
-              scheduledAt: new Date(d.scheduledAt).toISOString(),
-            })
-          )}
-          className="space-y-4"
-        >
-          {participantOptions.patients.length === 0 || participantOptions.doctors.length === 0 ? (
-            <p className="text-sm text-muted bg-surface rounded-md p-3">
-              Invite doctors and patients, then schedule once at least one appointment exists to
-              populate participant lists. New appointments need tenant doctor and patient profile IDs.
-            </p>
-          ) : null}
-          <Select
-            label="Patient"
-            placeholder="Select patient"
-            options={participantOptions.patients}
-            error={errors.patientId?.message}
-            required
-            {...register('patientId')}
-          />
-          <Select
-            label="Doctor"
-            placeholder="Select doctor"
-            options={participantOptions.doctors}
-            error={errors.doctorId?.message}
-            required
-            {...register('doctorId')}
-          />
-          <Input
-            label="Date & Time"
-            type="datetime-local"
-            error={errors.scheduledAt?.message}
-            required
-            {...register('scheduledAt')}
-          />
-          <ModalFooter>
-            <Button variant="outline" type="button" onClick={() => { setCreateOpen(false); reset(); }}>
-              Cancel
-            </Button>
-            <Button
-              type="submit"
-              loading={createMutation.isPending}
-              disabled={
-                participantOptions.patients.length === 0 ||
-                participantOptions.doctors.length === 0
-              }
-            >
-              Schedule
-            </Button>
-          </ModalFooter>
-        </form>
-      </Modal>
+      <ScheduleAppointmentModal
+        open={createOpen}
+        onClose={() => setCreateOpen(false)}
+        role={role}
+      />
     </div>
   );
 }

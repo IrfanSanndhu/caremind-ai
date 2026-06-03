@@ -1,9 +1,14 @@
 import { getCentralPrisma } from '../../core/tenant-registry.js';
 import type { PrismaClient } from '../../../node_modules/.prisma/tenant-client/index.js';
-import { NotFoundError } from '../../core/errors.js';
+import { auditLog } from '../../core/audit-logger.js';
+import { ForbiddenError, NotFoundError } from '../../core/errors.js';
 import type { AuthContext } from '../../types/auth.js';
 import * as repo from './patients.repository.js';
-import type { ListPatientsQuery, ListPatientSessionsQuery } from './patients.schema.js';
+import type {
+  ListPatientsQuery,
+  ListPatientSessionsQuery,
+  ReassignPrimaryDoctorInput,
+} from './patients.schema.js';
 
 async function emailsByUserIds(userIds: string[]): Promise<Map<string, string>> {
   if (userIds.length === 0) return new Map();
@@ -23,6 +28,11 @@ export async function listPatients(
   let doctorId: string | null = null;
   if (auth.role === 'doctor') {
     const doctor = await tenantPrisma.doctor.findFirst({ where: { userId: auth.userId } });
+    if (doctor) doctorId = doctor.id;
+  } else if (auth.role === 'admin' && query.doctorId) {
+    const doctor = await tenantPrisma.doctor.findFirst({
+      where: { id: query.doctorId, orgId: auth.orgId },
+    });
     if (doctor) doctorId = doctor.id;
   }
 
@@ -49,6 +59,47 @@ export async function listPatients(
   }));
 
   return { patients, total, page: query.page, limit: query.limit };
+}
+
+export async function reassignPrimaryDoctor(
+  auth: AuthContext,
+  tenantPrisma: PrismaClient,
+  patientId: string,
+  input: ReassignPrimaryDoctorInput,
+) {
+  if (auth.role !== 'admin') {
+    throw new ForbiddenError('Only admins can reassign patients');
+  }
+
+  const patient = await repo.findPatientById(tenantPrisma, patientId);
+  if (!patient || patient.orgId !== auth.orgId) {
+    throw new NotFoundError('Patient not found');
+  }
+
+  const doctor = await tenantPrisma.doctor.findFirst({
+    where: { id: input.doctorId, orgId: auth.orgId, deletedAt: null },
+  });
+  if (!doctor) {
+    throw new NotFoundError('Doctor not found');
+  }
+
+  await repo.updatePatientPrimaryDoctor(tenantPrisma, patientId, auth.orgId, input.doctorId);
+
+  await auditLog({
+    tenantPrisma,
+    userId: auth.userId,
+    orgId: auth.orgId,
+    action: 'WRITE_NOTE',
+    resourceType: 'Patient',
+    resourceId: patientId,
+    metadata: { primaryDoctorId: input.doctorId },
+  });
+
+  return {
+    patientId,
+    primaryDoctorId: input.doctorId,
+    primaryDoctorName: `Dr. ${doctor.firstName} ${doctor.lastName}`.trim(),
+  };
 }
 
 export async function getPatient(

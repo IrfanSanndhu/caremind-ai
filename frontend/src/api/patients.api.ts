@@ -5,6 +5,7 @@ import type { Patient, PatientGender, PatientSession, PaginatedResponse } from '
 export interface ListPatientsParams {
   page?: number;
   pageSize?: number;
+  doctorId?: string;
 }
 
 interface BackendPatientsPage {
@@ -54,6 +55,7 @@ export const patientsApi = {
       params: listQueryParams({
         page: params?.page,
         limit: params?.pageSize ?? 20,
+        doctorId: params?.doctorId,
       } as Record<string, string | number | undefined>),
     });
     const data = unwrap(res) as BackendPatientsPage;
@@ -63,6 +65,18 @@ export const patientsApi = {
       data.page ?? 1,
       data.limit ?? 20,
     );
+  },
+
+  reassignPrimaryDoctor: async (
+    patientId: string,
+    doctorId: string,
+  ): Promise<{ patientId: string; primaryDoctorId: string; primaryDoctorName: string }> => {
+    const res = await apiClient.patch(`/api/patients/${patientId}/primary-doctor`, { doctorId });
+    return unwrap(res) as {
+      patientId: string;
+      primaryDoctorId: string;
+      primaryDoctorName: string;
+    };
   },
 
   get: async (id: string): Promise<Patient> => {

@@ -13,21 +13,25 @@ interface MobileNavItem {
   to: string;
   label: string;
   icon: React.ReactNode;
+  roles: string[];
 }
 
 const mobileNavItems: MobileNavItem[] = [
-  { to: '/dashboard', label: 'Home', icon: <LayoutDashboard className="w-5 h-5" /> },
-  { to: '/appointments', label: 'Appts', icon: <Calendar className="w-5 h-5" /> },
-  { to: '/ai-assistant', label: 'AI Chat', icon: <BrainCircuit className="w-5 h-5" /> },
-  { to: '/documents', label: 'Docs', icon: <FileText className="w-5 h-5" /> },
-  { to: '/profile', label: 'Profile', icon: <User className="w-5 h-5" /> },
+  { to: '/dashboard', label: 'Home', icon: <LayoutDashboard className="w-5 h-5" />, roles: ['admin', 'doctor', 'patient'] },
+  { to: '/appointments', label: 'Appts', icon: <Calendar className="w-5 h-5" />, roles: ['admin', 'doctor', 'patient'] },
+  { to: '/ai-assistant', label: 'AI Chat', icon: <BrainCircuit className="w-5 h-5" />, roles: ['doctor', 'patient'] },
+  { to: '/documents', label: 'Docs', icon: <FileText className="w-5 h-5" />, roles: ['doctor', 'patient'] },
+  { to: '/profile', label: 'Profile', icon: <User className="w-5 h-5" />, roles: ['admin', 'doctor', 'patient'] },
 ];
 
 export function MobileNav() {
-  const { isAuthenticated } = useAuthStore();
+  const { isAuthenticated, role } = useAuthStore();
   const location = useLocation();
 
   if (!isAuthenticated) return null;
+
+  const userRole = role ?? 'patient';
+  const filteredItems = mobileNavItems.filter((item) => item.roles.includes(userRole));
 
   return (
     <nav
@@ -35,7 +39,7 @@ export function MobileNav() {
       aria-label="Mobile navigation"
     >
       <ul className="flex items-center justify-around h-16">
-        {mobileNavItems.map((item) => {
+        {filteredItems.map((item) => {
           const isActive = location.pathname.startsWith(item.to);
           return (
             <li key={item.to} className="flex-1">

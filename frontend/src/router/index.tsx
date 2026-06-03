@@ -74,8 +74,22 @@ export const router = createBrowserRouter([
           },
           { path: 'appointments', element: <AppointmentsPage /> },
           { path: 'appointments/:id', element: <AppointmentDetailPage /> },
-          { path: 'documents', element: <DocumentsPage /> },
-          { path: 'ai-assistant', element: <AiAssistantPage /> },
+          {
+            path: 'documents',
+            element: (
+              <RoleGuard allowedRoles={[UserRole.DOCTOR, UserRole.PATIENT]}>
+                <DocumentsPage />
+              </RoleGuard>
+            ),
+          },
+          {
+            path: 'ai-assistant',
+            element: (
+              <RoleGuard allowedRoles={[UserRole.DOCTOR, UserRole.PATIENT]}>
+                <AiAssistantPage />
+              </RoleGuard>
+            ),
+          },
           {
             path: 'ai-outputs',
             element: (

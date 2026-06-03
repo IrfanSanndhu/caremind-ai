@@ -30,6 +30,8 @@ export const listUsersSchema = z.object({
   page: z.coerce.number().min(1).default(1),
   limit: z.coerce.number().min(1).max(100).default(20),
   role: z.enum(['patient', 'doctor', 'admin']).optional(),
+  doctorId: z.string().uuid().optional(),
+  search: z.string().max(200).optional(),
 });
 
 export type InviteDoctorInput = z.infer<typeof inviteDoctorSchema>;

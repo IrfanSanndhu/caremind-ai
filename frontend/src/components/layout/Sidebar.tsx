@@ -32,9 +32,9 @@ const navItems: NavItem[] = [
   { to: '/dashboard', label: 'Dashboard', icon: <LayoutDashboard className="w-5 h-5" />, roles: ['admin', 'doctor', 'patient'] },
   { to: '/patients', label: 'Patients', icon: <User className="w-5 h-5" />, roles: ['doctor'] },
   { to: '/appointments', label: 'Appointments', icon: <Calendar className="w-5 h-5" />, roles: ['admin', 'doctor', 'patient'] },
-  { to: '/ai-assistant', label: 'AI Assistant', icon: <BrainCircuit className="w-5 h-5" />, roles: ['admin', 'doctor', 'patient'] },
+  { to: '/ai-assistant', label: 'AI Assistant', icon: <BrainCircuit className="w-5 h-5" />, roles: ['doctor', 'patient'] },
   { to: '/ai-outputs', label: 'AI Outputs', icon: <FileCheck className="w-5 h-5" />, roles: ['admin', 'doctor'] },
-  { to: '/documents', label: 'Documents', icon: <FileText className="w-5 h-5" />, roles: ['admin', 'doctor', 'patient'] },
+  { to: '/documents', label: 'Documents', icon: <FileText className="w-5 h-5" />, roles: ['doctor', 'patient'] },
   { to: '/users', label: 'Users', icon: <Users className="w-5 h-5" />, roles: ['admin'] },
   { to: '/admin/dashboard', label: 'Admin Panel', icon: <ShieldCheck className="w-5 h-5" />, roles: ['admin'] },
 ];

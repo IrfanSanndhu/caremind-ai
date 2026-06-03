@@ -83,6 +83,9 @@ export function mapCentralUser(raw: {
   createdAt: Date | string;
   lastLoginAt?: Date | string | null;
   name?: string | null;
+  patientProfileId?: string;
+  primaryDoctorId?: string | null;
+  primaryDoctorName?: string | null;
 }): User {
   return {
     id: raw.id,
@@ -90,6 +93,9 @@ export function mapCentralUser(raw: {
     role: raw.role,
     orgId: '',
     name: raw.name ?? undefined,
+    patientProfileId: raw.patientProfileId,
+    primaryDoctorId: raw.primaryDoctorId,
+    primaryDoctorName: raw.primaryDoctorName,
     mfaEnabled: raw.mfaEnabled,
     lastLogin: raw.lastLoginAt
       ? typeof raw.lastLoginAt === 'string'

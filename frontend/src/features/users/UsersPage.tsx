@@ -1,6 +1,6 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Plus, Search, Trash2, ShieldCheck } from 'lucide-react';
+import { Plus, Search, Trash2, ShieldCheck, UserCog } from 'lucide-react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -15,7 +15,8 @@ import { PageHeader } from '@/components/layout/PageHeader';
 import { Avatar } from '@/components/ui/Avatar';
 import { usersApi, userKeys } from '@/api/users.api';
 import { useAuthStore } from '@/stores/auth.store';
-import type { UserRole } from '@/types';
+import type { User, UserRole } from '@/types';
+import { ReassignPatientDoctorModal } from './ReassignPatientDoctorModal';
 import { formatDate, formatRelative } from '@/utils';
 import { cn } from '@/utils/cn';
 
@@ -46,15 +47,27 @@ export function UsersPage() {
   const { role: currentRole } = useAuthStore();
   const queryClient = useQueryClient();
   const [roleFilter, setRoleFilter] = useState<RoleFilter>('all');
+  const [doctorFilter, setDoctorFilter] = useState('');
   const [search, setSearch] = useState('');
   const [page, setPage] = useState(1);
   const [inviteDoctorOpen, setInviteDoctorOpen] = useState(false);
   const [invitePatientOpen, setInvitePatientOpen] = useState(false);
   const [deleteUserId, setDeleteUserId] = useState<string | null>(null);
+  const [reassignPatient, setReassignPatient] = useState<User | null>(null);
+
+  const showDoctorFilter = currentRole === 'admin' && roleFilter !== 'doctor';
+
+  const effectiveRole =
+    showDoctorFilter && doctorFilter
+      ? 'patient'
+      : roleFilter !== 'all'
+        ? (roleFilter as 'admin' | 'doctor' | 'patient')
+        : undefined;
 
   const params = {
-    role: roleFilter !== 'all' ? (roleFilter as 'admin' | 'doctor' | 'patient') : undefined,
-    search: search || undefined,
+    role: effectiveRole,
+    doctorId: showDoctorFilter && doctorFilter ? doctorFilter : undefined,
+    search: search.trim() || undefined,
     page,
     pageSize: 15,
   };
@@ -65,6 +78,12 @@ export function UsersPage() {
     retry: 1,
   });
 
+  const visibleUsers = useMemo(() => {
+    const items = data?.items ?? [];
+    if (!showDoctorFilter || !doctorFilter) return items;
+    return items.filter((u) => u.role === 'patient');
+  }, [data?.items, doctorFilter, showDoctorFilter]);
+
   const doctorForm = useForm<InviteDoctorValues>({ resolver: zodResolver(inviteDoctorSchema) });
   const patientForm = useForm<InvitePatientValues>({
     resolver: zodResolver(invitePatientSchema),
@@ -72,11 +91,14 @@ export function UsersPage() {
   });
 
   const { data: doctorProfiles } = useQuery({
-    queryKey: ['doctor-profiles'],
+    queryKey: userKeys.doctorProfiles(),
     queryFn: () => usersApi.doctorProfiles(),
     enabled: currentRole === 'admin',
     retry: 1,
   });
+
+  const showPatientDoctorColumn =
+    currentRole === 'admin' && (roleFilter === 'patient' || roleFilter === 'all');
 
   const inviteDoctorMutation = useMutation({
     mutationFn: usersApi.inviteDoctor,
@@ -154,7 +176,11 @@ export function UsersPage() {
             <button
               key={t.value}
               type="button"
-              onClick={() => { setRoleFilter(t.value); setPage(1); }}
+              onClick={() => {
+                setRoleFilter(t.value);
+                setPage(1);
+                if (t.value === 'doctor' || t.value === 'all') setDoctorFilter('');
+              }}
               className={cn(
                 'px-3 py-1.5 rounded-md text-sm font-medium transition-all whitespace-nowrap min-h-[36px]',
                 roleFilter === t.value
@@ -166,6 +192,29 @@ export function UsersPage() {
             </button>
           ))}
         </div>
+        {showDoctorFilter && (
+          <div className="w-full sm:w-64">
+            <Select
+              label="Filter by doctor"
+              options={[
+                { value: '', label: 'All doctors' },
+                ...(doctorProfiles ?? []).map((d) => ({
+                  value: d.id,
+                  label: d.email
+                    ? `Dr. ${d.firstName} ${d.lastName} (${d.email})`.trim()
+                    : `Dr. ${d.firstName} ${d.lastName}`.trim(),
+                })),
+              ]}
+              value={doctorFilter}
+              onChange={(e) => {
+                const next = e.target.value;
+                setDoctorFilter(next);
+                setPage(1);
+                if (next) setRoleFilter('patient');
+              }}
+            />
+          </div>
+        )}
         <div className="flex-1 max-w-xs">
           <Input
             placeholder="Search users..."
@@ -185,6 +234,9 @@ export function UsersPage() {
                 <tr className="border-b border-border bg-surface">
                   <th className="text-left px-4 py-3 font-semibold text-slate-700">User</th>
                   <th className="text-left px-4 py-3 font-semibold text-slate-700">Role</th>
+                  {showPatientDoctorColumn && (
+                    <th className="text-left px-4 py-3 font-semibold text-slate-700">Assigned Doctor</th>
+                  )}
                   <th className="text-left px-4 py-3 font-semibold text-slate-700">MFA</th>
                   <th className="text-left px-4 py-3 font-semibold text-slate-700">Last Login</th>
                   <th className="text-left px-4 py-3 font-semibold text-slate-700">Joined</th>
@@ -195,21 +247,21 @@ export function UsersPage() {
                 {isLoading ? (
                   Array.from({ length: 5 }).map((_, i) => (
                     <tr key={i}>
-                      {Array.from({ length: 6 }).map((_, j) => (
+                      {Array.from({ length: showPatientDoctorColumn ? 7 : 6 }).map((_, j) => (
                         <td key={j} className="px-4 py-3">
                           <Skeleton className="h-4 w-full" />
                         </td>
                       ))}
                     </tr>
                   ))
-                ) : data?.items.length === 0 ? (
+                ) : visibleUsers.length === 0 ? (
                   <tr>
-                    <td colSpan={6} className="py-12">
+                    <td colSpan={showPatientDoctorColumn ? 7 : 6} className="py-12">
                       <EmptyState title="No users found" />
                     </td>
                   </tr>
                 ) : (
-                  data?.items.map((user) => (
+                  visibleUsers.map((user) => (
                     <tr key={user.id} className="hover:bg-surface/60 transition-colors">
                       <td className="px-4 py-3">
                         <div className="flex items-center gap-3">
@@ -225,6 +277,13 @@ export function UsersPage() {
                           {user.role}
                         </span>
                       </td>
+                      {showPatientDoctorColumn && (
+                        <td className="px-4 py-3 text-slate-700 text-sm">
+                          {user.role === 'patient'
+                            ? user.primaryDoctorName ?? '—'
+                            : '—'}
+                        </td>
+                      )}
                       <td className="px-4 py-3">
                         {user.mfaEnabled ? (
                           <div className="flex items-center gap-1 text-success-600 text-xs">
@@ -242,14 +301,26 @@ export function UsersPage() {
                         {user.createdAt ? formatDate(user.createdAt) : '—'}
                       </td>
                       <td className="px-4 py-3 text-right">
-                        <button
-                          type="button"
-                          onClick={() => setDeleteUserId(user.id)}
-                          className="p-2 text-muted hover:text-danger hover:bg-danger-50 rounded-md transition-colors"
-                          aria-label={`Delete ${user.email}`}
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
+                        <div className="flex items-center justify-end gap-1">
+                          {user.role === 'patient' && user.patientProfileId && (
+                            <button
+                              type="button"
+                              onClick={() => setReassignPatient(user)}
+                              className="p-2 text-muted hover:text-primary hover:bg-primary-50 rounded-md transition-colors"
+                              aria-label={`Reassign ${user.email}`}
+                            >
+                              <UserCog className="w-4 h-4" />
+                            </button>
+                          )}
+                          <button
+                            type="button"
+                            onClick={() => setDeleteUserId(user.id)}
+                            className="p-2 text-muted hover:text-danger hover:bg-danger-50 rounded-md transition-colors"
+                            aria-label={`Delete ${user.email}`}
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   ))
@@ -275,7 +346,7 @@ export function UsersPage() {
             </Card>
           ))
         ) : (
-          data?.items.map((user) => (
+          visibleUsers.map((user) => (
             <Card key={user.id} padding="md">
               <div className="flex items-center gap-3">
                 <Avatar name={user.name ?? user.email} size="md" />
@@ -288,15 +359,30 @@ export function UsersPage() {
                     </span>
                     {user.mfaEnabled && <ShieldCheck className="w-3.5 h-3.5 text-success" />}
                   </div>
+                  {user.role === 'patient' && user.primaryDoctorName && (
+                    <p className="text-xs text-muted mt-1">{user.primaryDoctorName}</p>
+                  )}
                 </div>
-                <button
-                  type="button"
-                  onClick={() => setDeleteUserId(user.id)}
-                  className="p-2 text-muted hover:text-danger"
-                  aria-label="Delete user"
-                >
-                  <Trash2 className="w-4 h-4" />
-                </button>
+                <div className="flex gap-1">
+                  {user.role === 'patient' && user.patientProfileId && (
+                    <button
+                      type="button"
+                      onClick={() => setReassignPatient(user)}
+                      className="p-2 text-muted hover:text-primary"
+                      aria-label="Reassign doctor"
+                    >
+                      <UserCog className="w-4 h-4" />
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => setDeleteUserId(user.id)}
+                    className="p-2 text-muted hover:text-danger"
+                    aria-label="Delete user"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                </div>
               </div>
             </Card>
           ))
@@ -339,7 +425,9 @@ export function UsersPage() {
               placeholder="Select doctor"
               options={(doctorProfiles ?? []).map((d) => ({
                 value: d.id,
-                label: `Dr. ${d.firstName} ${d.lastName}`.trim(),
+                label: d.email
+                  ? `Dr. ${d.firstName} ${d.lastName} (${d.email})`.trim()
+                  : `Dr. ${d.firstName} ${d.lastName}`.trim(),
               }))}
               error={patientForm.formState.errors.doctorId?.message}
               required
@@ -361,6 +449,16 @@ export function UsersPage() {
           </ModalFooter>
         </form>
       </Modal>
+
+      <ReassignPatientDoctorModal
+        patient={reassignPatient}
+        doctors={doctorProfiles ?? []}
+        onClose={() => setReassignPatient(null)}
+        onSuccess={() => {
+          queryClient.invalidateQueries({ queryKey: userKeys.all });
+          queryClient.invalidateQueries({ queryKey: ['patients'] });
+        }}
+      />
 
       {/* Delete Confirm */}
       <Modal open={!!deleteUserId} onClose={() => setDeleteUserId(null)} title="Remove User" size="sm">

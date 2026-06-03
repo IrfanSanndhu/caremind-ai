@@ -4,6 +4,8 @@ import type { InviteUserRequest, PaginatedResponse, User } from '@/types';
 
 export interface ListUsersParams {
   role?: 'admin' | 'doctor' | 'patient';
+  doctorId?: string;
+  search?: string;
   page?: number;
   pageSize?: number;
 }
@@ -16,6 +18,10 @@ interface BackendUsersPage {
     mfaEnabled: boolean;
     createdAt: string;
     lastLoginAt?: string | null;
+    name?: string | null;
+    patientProfileId?: string;
+    primaryDoctorId?: string | null;
+    primaryDoctorName?: string | null;
   }>;
   total: number;
   page: number;
@@ -23,7 +29,7 @@ interface BackendUsersPage {
 }
 
 interface BackendDoctorProfilesResponse {
-  doctors: Array<{ id: string; firstName: string; lastName: string }>;
+  doctors: Array<{ id: string; firstName: string; lastName: string; email?: string }>;
 }
 
 export const usersApi = {
@@ -72,4 +78,5 @@ export const userKeys = {
   all: ['users'] as const,
   lists: () => [...userKeys.all, 'list'] as const,
   list: (params?: ListUsersParams) => [...userKeys.lists(), params] as const,
+  doctorProfiles: () => [...userKeys.all, 'doctor-profiles'] as const,
 };

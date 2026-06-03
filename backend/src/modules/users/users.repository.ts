@@ -36,13 +36,14 @@ export async function createPatientProfile(
 export async function listCentralUsers(
   centralPrisma: CentralPrisma,
   orgId: string,
-  options: { skip: number; take: number; role?: string },
+  options: { skip: number; take: number; role?: string; userIds?: string[] },
 ) {
   return centralPrisma.user.findMany({
     where: {
       orgId,
       deletedAt: null,
       ...(options.role && { role: options.role as 'patient' | 'doctor' | 'admin' }),
+      ...(options.userIds && { id: { in: options.userIds } }),
     },
     skip: options.skip,
     take: options.take,
@@ -62,14 +63,52 @@ export async function countCentralUsers(
   centralPrisma: CentralPrisma,
   orgId: string,
   role?: string,
+  userIds?: string[],
 ) {
   return centralPrisma.user.count({
     where: {
       orgId,
       deletedAt: null,
       ...(role && { role: role as 'patient' | 'doctor' | 'admin' }),
+      ...(userIds && { id: { in: userIds } }),
     },
   });
+}
+
+export async function listPatientUserIdsByPrimaryDoctor(
+  tenantPrisma: TenantPrisma,
+  orgId: string,
+  doctorId: string,
+) {
+  const patients = await tenantPrisma.patient.findMany({
+    where: { orgId, deletedAt: null, primaryDoctorId: doctorId },
+    select: { userId: true },
+  });
+  return patients.map((p) => p.userId);
+}
+
+export async function listPatientAssignmentsByOrg(tenantPrisma: TenantPrisma, orgId: string) {
+  const patients = await tenantPrisma.patient.findMany({
+    where: { orgId, deletedAt: null },
+    select: {
+      id: true,
+      userId: true,
+      primaryDoctorId: true,
+      primaryDoctor: { select: { firstName: true, lastName: true } },
+    },
+  });
+  return new Map(
+    patients.map((p) => [
+      p.userId,
+      {
+        patientProfileId: p.id,
+        primaryDoctorId: p.primaryDoctorId,
+        primaryDoctorName: p.primaryDoctor
+          ? `Dr. ${p.primaryDoctor.firstName} ${p.primaryDoctor.lastName}`.trim()
+          : null,
+      },
+    ]),
+  );
 }
 
 export async function softDeleteUser(centralPrisma: CentralPrisma, userId: string) {
@@ -87,7 +126,21 @@ export async function listDoctors(tenantPrisma: TenantPrisma, orgId: string) {
   return tenantPrisma.doctor.findMany({
     where: { orgId, deletedAt: null },
     orderBy: { createdAt: 'desc' },
-    select: { id: true, firstName: true, lastName: true },
+    select: { id: true, userId: true, firstName: true, lastName: true },
+  });
+}
+
+export async function softDeleteDoctorByUserId(tenantPrisma: TenantPrisma, userId: string) {
+  return tenantPrisma.doctor.updateMany({
+    where: { userId, deletedAt: null },
+    data: { deletedAt: new Date() },
+  });
+}
+
+export async function softDeletePatientByUserId(tenantPrisma: TenantPrisma, userId: string) {
+  return tenantPrisma.patient.updateMany({
+    where: { userId, deletedAt: null },
+    data: { deletedAt: new Date() },
   });
 }
 
