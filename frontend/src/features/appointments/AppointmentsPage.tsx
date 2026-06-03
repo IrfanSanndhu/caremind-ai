@@ -106,6 +106,25 @@ export function AppointmentsPage() {
     onError: () => toast.error('Failed to schedule appointment'),
   });
 
+  const updateStatusMutation = useMutation({
+    mutationFn: (params: { id: string; status: AppointmentStatus }) =>
+      appointmentsApi.updateStatus(params.id, params.status),
+    onSuccess: () => {
+      toast.success('Appointment updated');
+      queryClient.invalidateQueries({ queryKey: appointmentKeys.all });
+    },
+    onError: () => toast.error('Failed to update appointment'),
+  });
+
+  const cancelMutation = useMutation({
+    mutationFn: (id: string) => appointmentsApi.cancel(id),
+    onSuccess: () => {
+      toast.success('Appointment cancelled');
+      queryClient.invalidateQueries({ queryKey: appointmentKeys.all });
+    },
+    onError: () => toast.error('Failed to cancel appointment'),
+  });
+
   return (
     <div className="p-6 space-y-5">
       <PageHeader
@@ -231,6 +250,47 @@ export function AppointmentsPage() {
                               Join
                             </Button>
                           )}
+
+                          {(role === UserRole.DOCTOR || role === UserRole.ADMIN) && appt.status === 'scheduled' && (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                updateStatusMutation.mutate({ id: appt.id, status: AppointmentStatus.IN_PROGRESS });
+                              }}
+                            >
+                              Start
+                            </Button>
+                          )}
+
+                          {(role === UserRole.DOCTOR || role === UserRole.ADMIN) && appt.status === 'in_progress' && (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                updateStatusMutation.mutate({ id: appt.id, status: AppointmentStatus.COMPLETED });
+                              }}
+                            >
+                              Complete
+                            </Button>
+                          )}
+
+                          {(role === UserRole.DOCTOR || role === UserRole.ADMIN) &&
+                            appt.status !== 'cancelled' &&
+                            appt.status !== 'completed' && (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                cancelMutation.mutate(appt.id);
+                              }}
+                            >
+                              Cancel
+                            </Button>
+                          )}
                         </div>
                       </td>
                     </tr>
@@ -278,6 +338,63 @@ export function AppointmentsPage() {
                 <p className="text-sm text-muted mt-1">{formatDateTime(appt.scheduledAt)}</p>
                 <div className="flex items-center gap-2 mt-2">
                   <AppointmentStatusBadge status={appt.status} />
+                </div>
+
+                <div className="flex flex-wrap gap-2 mt-3">
+                  {(appt.status === 'scheduled' || appt.status === 'in_progress') && (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      leftIcon={<Video className="w-3.5 h-3.5" />}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        navigate(`/appointments/${appt.id}/consultation`);
+                      }}
+                    >
+                      Join
+                    </Button>
+                  )}
+
+                  {(role === UserRole.DOCTOR || role === UserRole.ADMIN) && appt.status === 'scheduled' && (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        updateStatusMutation.mutate({ id: appt.id, status: AppointmentStatus.IN_PROGRESS });
+                      }}
+                    >
+                      Start
+                    </Button>
+                  )}
+
+                  {(role === UserRole.DOCTOR || role === UserRole.ADMIN) && appt.status === 'in_progress' && (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        updateStatusMutation.mutate({ id: appt.id, status: AppointmentStatus.COMPLETED });
+                      }}
+                    >
+                      Complete
+                    </Button>
+                  )}
+
+                  {(role === UserRole.DOCTOR || role === UserRole.ADMIN) &&
+                    appt.status !== 'cancelled' &&
+                    appt.status !== 'completed' && (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        cancelMutation.mutate(appt.id);
+                      }}
+                    >
+                      Cancel
+                    </Button>
+                  )}
                 </div>
               </div>
             </div>

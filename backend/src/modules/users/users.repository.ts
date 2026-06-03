@@ -22,8 +22,10 @@ export async function createPatientProfile(
     id: string;
     userId: string;
     orgId: string;
+    primaryDoctorId: string | null;
     firstName: string;
     lastName: string;
+    gender: 'male' | 'female' | 'other' | 'prefer_not_to_say';
     dateOfBirth?: Date;
     phone?: string;
   },
@@ -79,6 +81,30 @@ export async function softDeleteUser(centralPrisma: CentralPrisma, userId: strin
 
 export async function findDoctorByUserId(tenantPrisma: TenantPrisma, userId: string) {
   return tenantPrisma.doctor.findFirst({ where: { userId } });
+}
+
+export async function listDoctors(tenantPrisma: TenantPrisma, orgId: string) {
+  return tenantPrisma.doctor.findMany({
+    where: { orgId, deletedAt: null },
+    orderBy: { createdAt: 'desc' },
+    select: { id: true, firstName: true, lastName: true },
+  });
+}
+
+export async function listDoctorNamesByUserId(tenantPrisma: TenantPrisma, orgId: string) {
+  const doctors = await tenantPrisma.doctor.findMany({
+    where: { orgId, deletedAt: null },
+    select: { userId: true, firstName: true, lastName: true },
+  });
+  return new Map(doctors.map((d) => [d.userId, `${d.firstName} ${d.lastName}`.trim()]));
+}
+
+export async function listPatientNamesByUserId(tenantPrisma: TenantPrisma, orgId: string) {
+  const patients = await tenantPrisma.patient.findMany({
+    where: { orgId, deletedAt: null },
+    select: { userId: true, firstName: true, lastName: true },
+  });
+  return new Map(patients.map((p) => [p.userId, `${p.firstName} ${p.lastName}`.trim()]));
 }
 
 export async function findPatientByUserId(tenantPrisma: TenantPrisma, userId: string) {

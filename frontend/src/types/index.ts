@@ -80,6 +80,14 @@ export interface Doctor {
   user?: User;
 }
 
+export const PatientGender = {
+  MALE: 'male',
+  FEMALE: 'female',
+  OTHER: 'other',
+  PREFER_NOT_TO_SAY: 'prefer_not_to_say',
+} as const;
+export type PatientGender = (typeof PatientGender)[keyof typeof PatientGender];
+
 export interface Patient {
   id: string;
   userId: string;
@@ -87,9 +95,19 @@ export interface Patient {
   firstName: string;
   lastName: string;
   email: string;
-  dateOfBirth?: string;
+  gender?: PatientGender | null;
+  dateOfBirth?: string | null;
   phone?: string;
+  sessionCount?: number;
   user?: User;
+}
+
+export interface PatientSession {
+  id: string;
+  scheduledAt: string;
+  status: AppointmentStatus;
+  consentStatus: ConsentStatus;
+  doctor: { id: string; firstName: string; lastName: string } | null;
 }
 
 export interface Appointment {
@@ -235,6 +253,8 @@ export interface InviteUserRequest {
   lastName: string;
   email: string;
   role: 'doctor' | 'patient';
+  gender?: PatientGender;
+  doctorId?: string;
   specialty?: string;
   licenseNumber?: string;
   dateOfBirth?: string;

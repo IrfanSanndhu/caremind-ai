@@ -22,6 +22,10 @@ interface BackendUsersPage {
   limit: number;
 }
 
+interface BackendDoctorProfilesResponse {
+  doctors: Array<{ id: string; firstName: string; lastName: string }>;
+}
+
 export const usersApi = {
   list: async (params?: ListUsersParams): Promise<PaginatedResponse<User>> => {
     const res = await apiClient.get('/api/users', {
@@ -44,10 +48,19 @@ export const usersApi = {
   },
 
   invitePatient: async (
-    payload: Pick<InviteUserRequest, 'email' | 'firstName' | 'lastName' | 'dateOfBirth' | 'phone'>
+    payload: Pick<
+      InviteUserRequest,
+      'email' | 'firstName' | 'lastName' | 'gender' | 'dateOfBirth' | 'phone' | 'doctorId'
+    >
   ): Promise<{ userId: string; patientId: string }> => {
     const res = await apiClient.post('/api/users/invite-patient', payload);
     return unwrap(res);
+  },
+
+  doctorProfiles: async (): Promise<BackendDoctorProfilesResponse['doctors']> => {
+    const res = await apiClient.get('/api/users/doctor-profiles');
+    const data = unwrap(res) as BackendDoctorProfilesResponse;
+    return data.doctors ?? [];
   },
 
   delete: async (id: string): Promise<void> => {

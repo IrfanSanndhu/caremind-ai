@@ -153,9 +153,17 @@ export async function doctorCopilot(
     topK: 8,
   });
 
+  if (chunks.length === 0) {
+    return {
+      response:
+        "I couldn't find any records for this patient yet (no documents, transcripts, or approved notes have been ingested). Ask a general clinical question, or add patient data first (upload documents or complete an appointment so a transcript/outputs exist).",
+      escalated: false,
+    };
+  }
+
   const contextChunks = chunks.map((c) => c.content);
   const systemPrompt = buildAssistantSystemPrompt('doctor', {
-    hasPatientContext: true,
+    hasPatientContext: contextChunks.length > 0,
     contextChunks,
   });
 

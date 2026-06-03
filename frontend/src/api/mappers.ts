@@ -82,12 +82,14 @@ export function mapCentralUser(raw: {
   mfaEnabled: boolean;
   createdAt: Date | string;
   lastLoginAt?: Date | string | null;
+  name?: string | null;
 }): User {
   return {
     id: raw.id,
     email: raw.email,
     role: raw.role,
     orgId: '',
+    name: raw.name ?? undefined,
     mfaEnabled: raw.mfaEnabled,
     lastLogin: raw.lastLoginAt
       ? typeof raw.lastLoginAt === 'string'

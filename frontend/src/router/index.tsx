@@ -27,6 +27,8 @@ import { AiOutputDetailPage } from '@/features/ai-outputs/AiOutputDetailPage';
 
 // Users
 import { UsersPage } from '@/features/users/UsersPage';
+import { PatientsPage } from '@/features/patients/PatientsPage';
+import { PatientDetailPage } from '@/features/patients/PatientDetailPage';
 
 // Admin
 import { AdminDashboardPage } from '@/features/admin/AdminDashboardPage';
@@ -54,6 +56,22 @@ export const router = createBrowserRouter([
         ),
         children: [
           { path: 'dashboard', element: <DashboardPage /> },
+          {
+            path: 'patients',
+            element: (
+              <RoleGuard allowedRoles={[UserRole.DOCTOR]}>
+                <PatientsPage />
+              </RoleGuard>
+            ),
+          },
+          {
+            path: 'patients/:id',
+            element: (
+              <RoleGuard allowedRoles={[UserRole.DOCTOR]}>
+                <PatientDetailPage />
+              </RoleGuard>
+            ),
+          },
           { path: 'appointments', element: <AppointmentsPage /> },
           { path: 'appointments/:id', element: <AppointmentDetailPage /> },
           { path: 'documents', element: <DocumentsPage /> },

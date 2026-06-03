@@ -10,6 +10,7 @@ import { requireRole } from './lib/middleware/auth.middleware.js';
 import { apiRateLimiter } from './lib/middleware/rate-limit.middleware.js';
 import { authRoutes } from './modules/auth/auth.routes.js';
 import { usersRoutes } from './modules/users/users.routes.js';
+import { patientsRoutes } from './modules/patients/patients.routes.js';
 import { appointmentRoutes } from './modules/appointments/appointments.routes.js';
 import { consultationRoutes } from './modules/consultations/consultations.routes.js';
 import { documentRoutes } from './modules/documents/documents.routes.js';
@@ -45,6 +46,7 @@ export function createApp(): express.Application {
   const tenantMiddleware = [authenticate, apiRateLimiter, resolveTenant];
 
   app.use('/api/users', ...tenantMiddleware, usersRoutes);
+  app.use('/api/patients', ...tenantMiddleware, patientsRoutes);
   app.use('/api/appointments', ...tenantMiddleware, appointmentRoutes);
   app.use('/api/consultations', ...tenantMiddleware, consultationRoutes);
   app.use('/api/documents', ...tenantMiddleware, documentRoutes);

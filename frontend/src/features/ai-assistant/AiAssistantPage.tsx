@@ -68,6 +68,7 @@ export function AiAssistantPage() {
   const [escalated, setEscalated] = useState(false);
   const [isDoctorMode, setIsDoctorMode] = useState(false);
   const [selectedAppointmentId, setSelectedAppointmentId] = useState('');
+  const [selectedPatientId, setSelectedPatientId] = useState('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
@@ -110,13 +111,57 @@ export function AiAssistantPage() {
 
     abortControllerRef.current = new AbortController();
 
+    // Doctor copilot uses /api/ai/doctor-copilot/:patientId (patient-wide context)
+    if (isDoctorMode) {
+      if (!selectedPatientId) {
+        setIsStreaming(false);
+        const errMsg: ChatMessage = {
+          id: crypto.randomUUID(),
+          role: 'assistant',
+          content: 'Select a patient to use Copilot mode.',
+          timestamp: new Date().toISOString(),
+        };
+        setMessages((prev) => [...prev, errMsg]);
+        return;
+      }
+
+      aiApi
+        .doctorCopilot({ patientId: selectedPatientId, q: text })
+        .then((res) => {
+          if (res.escalated) setEscalated(true);
+          const aiMsg: ChatMessage = {
+            id: crypto.randomUUID(),
+            role: 'assistant',
+            content: res.response,
+            timestamp: new Date().toISOString(),
+            escalated: res.escalated,
+          };
+          setMessages((prev) => [...prev, aiMsg]);
+        })
+        .catch((err: unknown) => {
+          const msg = err instanceof Error ? err.message : String(err);
+          const errMsg: ChatMessage = {
+            id: crypto.randomUUID(),
+            role: 'assistant',
+            content: `I encountered an error: ${msg}. Please try again.`,
+            timestamp: new Date().toISOString(),
+          };
+          setMessages((prev) => [...prev, errMsg]);
+        })
+        .finally(() => {
+          setIsStreaming(false);
+          setStreamingContent('');
+        });
+
+      return;
+    }
+
     let accumulatedContent = '';
 
     aiApi.streamChat(
       {
         message: text,
         appointmentId: selectedAppointmentId || undefined,
-        isDoctorCopilot: isDoctorMode,
       },
       (chunk) => {
         accumulatedContent += chunk;
@@ -148,7 +193,7 @@ export function AiAssistantPage() {
       },
       abortControllerRef.current.signal
     );
-  }, [input, isStreaming, selectedAppointmentId, isDoctorMode]);
+  }, [input, isStreaming, selectedAppointmentId, isDoctorMode, selectedPatientId]);
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === 'Enter' && !e.shiftKey) {
@@ -169,6 +214,16 @@ export function AiAssistantPage() {
     value: a.id,
     label: `${a.patient?.firstName} ${a.patient?.lastName} — ${new Date(a.scheduledAt).toLocaleDateString()}`,
   })) ?? [];
+
+  const patientOptions =
+    appointments?.items
+      .map((a) => a.patient)
+      .filter((p): p is NonNullable<typeof p> => !!p)
+      .reduce<Record<string, { value: string; label: string }>>((acc, p) => {
+        const label = `${p.firstName} ${p.lastName}`.trim();
+        acc[p.id] = { value: p.id, label };
+        return acc;
+      }, {}) ?? {};
 
   return (
     <div className="flex flex-col h-[calc(100vh-56px)]">
@@ -219,12 +274,25 @@ export function AiAssistantPage() {
         </div>
 
         {/* Context selector */}
-        {appointmentOptions.length > 0 && (
+        {!isDoctorMode && appointmentOptions.length > 0 && (
           <div className="mt-3 max-w-sm">
             <Select
               options={[{ value: '', label: 'No appointment context' }, ...appointmentOptions]}
               value={selectedAppointmentId}
               onChange={(e) => setSelectedAppointmentId(e.target.value)}
+            />
+          </div>
+        )}
+
+        {isDoctorMode && (
+          <div className="mt-3 max-w-sm">
+            <Select
+              options={[
+                { value: '', label: 'Select a patient' },
+                ...Object.values(patientOptions),
+              ]}
+              value={selectedPatientId}
+              onChange={(e) => setSelectedPatientId(e.target.value)}
             />
           </div>
         )}

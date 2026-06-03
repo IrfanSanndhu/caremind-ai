@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { patientGenderSchema } from '../patients/patients.schema.js';
 
 export const inviteDoctorSchema = z.object({
   email: z.string().email(),
@@ -12,7 +13,9 @@ export const invitePatientSchema = z.object({
   email: z.string().email(),
   firstName: z.string().min(1).max(100),
   lastName: z.string().min(1).max(100),
-  dateOfBirth: z.string().datetime().optional(),
+  doctorId: z.string().uuid().optional(),
+  gender: patientGenderSchema,
+  dateOfBirth: z.string().optional(),
   phone: z.string().max(20).optional(),
 });
 

@@ -7,11 +7,14 @@ import { z } from 'zod';
 import toast from 'react-hot-toast';
 import {
   Button, Card, Input, Modal, ModalFooter,
-  Pagination, EmptyState, Skeleton,
+  Pagination, EmptyState, Skeleton, Select,
 } from '@/components/ui';
+import { GENDER_OPTIONS } from '@/api/patients.api';
+import { PatientGender } from '@/types';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { Avatar } from '@/components/ui/Avatar';
 import { usersApi, userKeys } from '@/api/users.api';
+import { useAuthStore } from '@/stores/auth.store';
 import type { UserRole } from '@/types';
 import { formatDate, formatRelative } from '@/utils';
 import { cn } from '@/utils/cn';
@@ -30,6 +33,8 @@ const invitePatientSchema = z.object({
   firstName: z.string().min(1, 'Required'),
   lastName: z.string().min(1, 'Required'),
   email: z.string().email('Valid email required'),
+  doctorId: z.string().uuid().optional(),
+  gender: z.enum(['male', 'female', 'other', 'prefer_not_to_say']),
   dateOfBirth: z.string().optional(),
   phone: z.string().optional(),
 });
@@ -38,6 +43,7 @@ type InviteDoctorValues = z.infer<typeof inviteDoctorSchema>;
 type InvitePatientValues = z.infer<typeof invitePatientSchema>;
 
 export function UsersPage() {
+  const { role: currentRole } = useAuthStore();
   const queryClient = useQueryClient();
   const [roleFilter, setRoleFilter] = useState<RoleFilter>('all');
   const [search, setSearch] = useState('');
@@ -60,7 +66,17 @@ export function UsersPage() {
   });
 
   const doctorForm = useForm<InviteDoctorValues>({ resolver: zodResolver(inviteDoctorSchema) });
-  const patientForm = useForm<InvitePatientValues>({ resolver: zodResolver(invitePatientSchema) });
+  const patientForm = useForm<InvitePatientValues>({
+    resolver: zodResolver(invitePatientSchema),
+    defaultValues: { gender: PatientGender.MALE },
+  });
+
+  const { data: doctorProfiles } = useQuery({
+    queryKey: ['doctor-profiles'],
+    queryFn: () => usersApi.doctorProfiles(),
+    enabled: currentRole === 'admin',
+    retry: 1,
+  });
 
   const inviteDoctorMutation = useMutation({
     mutationFn: usersApi.inviteDoctor,
@@ -199,7 +215,7 @@ export function UsersPage() {
                         <div className="flex items-center gap-3">
                           <Avatar name={user.name ?? user.email} size="xs" />
                           <div>
-                            <p className="font-medium text-slate-900">{user.name ?? '—'}</p>
+                            <p className="font-medium text-slate-900">{user.name ?? user.email}</p>
                             <p className="text-xs text-muted">{user.email}</p>
                           </div>
                         </div>
@@ -316,6 +332,27 @@ export function UsersPage() {
             <Input label="Last Name" required error={patientForm.formState.errors.lastName?.message} {...patientForm.register('lastName')} />
           </div>
           <Input label="Email" type="email" required error={patientForm.formState.errors.email?.message} {...patientForm.register('email')} />
+
+          {currentRole === 'admin' && (
+            <Select
+              label="Assign to doctor"
+              placeholder="Select doctor"
+              options={(doctorProfiles ?? []).map((d) => ({
+                value: d.id,
+                label: `Dr. ${d.firstName} ${d.lastName}`.trim(),
+              }))}
+              error={patientForm.formState.errors.doctorId?.message}
+              required
+              {...patientForm.register('doctorId')}
+            />
+          )}
+
+          <Select
+            label="Gender"
+            options={[...GENDER_OPTIONS]}
+            error={patientForm.formState.errors.gender?.message}
+            {...patientForm.register('gender')}
+          />
           <Input label="Date of Birth" type="date" {...patientForm.register('dateOfBirth')} />
           <Input label="Phone" type="tel" placeholder="+1 (555) 000-0000" {...patientForm.register('phone')} />
           <ModalFooter>

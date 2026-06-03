@@ -68,11 +68,18 @@ export async function invitePatient(
   tenantPrisma: TenantPrisma,
   input: InvitePatientInput,
 ) {
+  let primaryDoctorId: string | null = null;
   if (auth.role === 'doctor') {
     const doctor = await repo.findDoctorByUserId(tenantPrisma, auth.userId);
     if (!doctor) {
       throw new ForbiddenError('Doctor profile not found for this account');
     }
+    primaryDoctorId = doctor.id;
+  } else {
+    if (!input.doctorId) {
+      throw new ForbiddenError('doctorId is required when inviting a patient as admin');
+    }
+    primaryDoctorId = input.doctorId;
   }
 
   const central = getCentralPrisma();
@@ -92,8 +99,10 @@ export async function invitePatient(
     id: patientId,
     userId,
     orgId: auth.orgId,
+    primaryDoctorId,
     firstName: input.firstName,
     lastName: input.lastName,
+    gender: input.gender,
     dateOfBirth: input.dateOfBirth ? new Date(input.dateOfBirth) : undefined,
     phone: input.phone,
   });
@@ -117,14 +126,52 @@ export async function invitePatient(
   return { userId, patientId };
 }
 
-export async function listUsers(orgId: string, options: { page: number; limit: number; role?: string }) {
+export async function listUsers(
+  auth: AuthContext,
+  tenantPrisma: TenantPrisma,
+  options: { page: number; limit: number; role?: string },
+) {
+  if (auth.role === 'doctor') {
+    const doctor = await repo.findDoctorByUserId(tenantPrisma, auth.userId);
+    if (!doctor) throw new ForbiddenError('Doctor profile not found for this account');
+    if (options.role && options.role !== 'patient') {
+      throw new ForbiddenError("Doctors can only list role='patient'");
+    }
+  }
+
   const central = getCentralPrisma();
   const skip = (options.page - 1) * options.limit;
+  const role = auth.role === 'doctor' ? 'patient' : options.role;
+
   const [users, total] = await Promise.all([
-    repo.listCentralUsers(central, orgId, { skip, take: options.limit, role: options.role }),
-    repo.countCentralUsers(central, orgId, options.role),
+    repo.listCentralUsers(central, auth.orgId, { skip, take: options.limit, role }),
+    repo.countCentralUsers(central, auth.orgId, role),
   ]);
-  return { users, total, page: options.page, limit: options.limit };
+
+  // Attach display names from tenant profiles for doctor/patient roles
+  const [doctorNames, patientNames] = await Promise.all([
+    repo.listDoctorNamesByUserId(tenantPrisma, auth.orgId),
+    repo.listPatientNamesByUserId(tenantPrisma, auth.orgId),
+  ]);
+
+  const withNames = users.map((u) => {
+    const name =
+      u.role === 'doctor'
+        ? doctorNames.get(u.id) ?? null
+        : u.role === 'patient'
+          ? patientNames.get(u.id) ?? null
+          : null;
+    return { ...u, name };
+  });
+
+  return { users: withNames, total, page: options.page, limit: options.limit };
+}
+
+export async function listDoctorProfiles(auth: AuthContext, tenantPrisma: TenantPrisma) {
+  if (auth.role !== 'admin') {
+    throw new ForbiddenError('Admin role required');
+  }
+  return repo.listDoctors(tenantPrisma, auth.orgId);
 }
 
 export async function deleteUser(

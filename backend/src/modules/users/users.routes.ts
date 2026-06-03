@@ -39,12 +39,24 @@ usersRoutes.post(
 );
 
 usersRoutes.get(
-  '/',
+  '/doctor-profiles',
   requireRole('admin'),
+  asyncHandler(async (req, res) => {
+    const doctors = await service.listDoctorProfiles(req.auth, req.tenantPrisma);
+    res.json({
+      data: { doctors },
+      meta: { requestId: uuidv4(), timestamp: new Date().toISOString() },
+    });
+  }),
+);
+
+usersRoutes.get(
+  '/',
+  requireRole('admin', 'doctor'),
   validate({ query: listUsersSchema }),
   asyncHandler(async (req, res) => {
     const query = req.query as { page: string; limit: string; role?: string };
-    const result = await service.listUsers(req.auth.orgId, {
+    const result = await service.listUsers(req.auth, req.tenantPrisma, {
       page: Number(query.page) || 1,
       limit: Number(query.limit) || 20,
       role: query.role,

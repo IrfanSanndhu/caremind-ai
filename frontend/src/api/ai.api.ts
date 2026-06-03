@@ -28,6 +28,14 @@ export const aiApi = {
     return unwrap(res);
   },
 
+  /** GET /api/ai/doctor-copilot/:patientId?q=... */
+  doctorCopilot: async (params: { patientId: string; q: string }): Promise<{ response: string; escalated: boolean }> => {
+    const res = await apiClient.get(`/api/ai/doctor-copilot/${params.patientId}`, {
+      params: { q: params.q },
+    });
+    return unwrap(res);
+  },
+
   streamChat: (
     payload: ChatRequest,
     onChunk: (chunk: string) => void,

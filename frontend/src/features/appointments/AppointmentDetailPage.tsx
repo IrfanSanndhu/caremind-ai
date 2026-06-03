@@ -58,6 +58,17 @@ export function AppointmentDetailPage() {
     onError: () => toast.error('Failed to cancel appointment'),
   });
 
+  const updateStatusMutation = useMutation({
+    mutationFn: (status: 'scheduled' | 'in_progress' | 'completed' | 'cancelled') =>
+      appointmentsApi.updateStatus(id!, status),
+    onSuccess: () => {
+      toast.success('Appointment updated');
+      queryClient.invalidateQueries({ queryKey: appointmentKeys.all });
+      queryClient.invalidateQueries({ queryKey: appointmentKeys.detail(id!) });
+    },
+    onError: () => toast.error('Failed to update appointment'),
+  });
+
   if (isLoading) {
     return (
       <div className="p-6 space-y-4">
@@ -109,7 +120,32 @@ export function AppointmentDetailPage() {
               Join Consultation
             </Button>
           )}
-          {(role === UserRole.ADMIN || role === UserRole.DOCTOR) && appointment.status !== 'cancelled' && (
+
+          {(role === UserRole.ADMIN || role === UserRole.DOCTOR) && appointment.status === 'scheduled' && (
+            <Button
+              variant="outline"
+              leftIcon={<Clock className="w-4 h-4" />}
+              onClick={() => updateStatusMutation.mutate('in_progress')}
+              loading={updateStatusMutation.isPending}
+            >
+              Start
+            </Button>
+          )}
+
+          {(role === UserRole.ADMIN || role === UserRole.DOCTOR) && appointment.status === 'in_progress' && (
+            <Button
+              variant="outline"
+              leftIcon={<CheckCircle className="w-4 h-4" />}
+              onClick={() => updateStatusMutation.mutate('completed')}
+              loading={updateStatusMutation.isPending}
+            >
+              Complete
+            </Button>
+          )}
+
+          {(role === UserRole.ADMIN || role === UserRole.DOCTOR) &&
+            appointment.status !== 'cancelled' &&
+            appointment.status !== 'completed' && (
             <Button
               variant="outline"
               leftIcon={<X className="w-4 h-4" />}

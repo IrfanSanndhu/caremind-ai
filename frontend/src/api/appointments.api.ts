@@ -55,6 +55,12 @@ export const appointmentsApi = {
     const res = await apiClient.post(`/api/appointments/${id}/consent`, { consentStatus });
     return mapAppointment(unwrap(res) as Record<string, unknown>);
   },
+
+  /** PATCH /api/appointments/:id — update status */
+  updateStatus: async (id: string, status: AppointmentStatus): Promise<Appointment> => {
+    const res = await apiClient.patch(`/api/appointments/${id}`, { status });
+    return mapAppointment(unwrap(res) as Record<string, unknown>);
+  },
 };
 
 export const appointmentKeys = {
