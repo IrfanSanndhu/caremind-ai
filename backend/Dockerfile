@@ -44,6 +44,8 @@ RUN npm ci --omit=dev
 COPY --from=builder /app/dist ./dist/
 COPY --from=builder /app/node_modules/.prisma ./node_modules/.prisma/
 COPY prisma ./prisma/
+COPY scripts/docker-migrate.sh scripts/docker-start.sh ./scripts/
+RUN chmod +x scripts/docker-migrate.sh scripts/docker-start.sh
 
 # Prisma CLI + engines required for per-org tenant migrations at register-org
 RUN npx prisma version
@@ -54,4 +56,4 @@ USER appuser
 
 EXPOSE 3000
 
-CMD ["node", "dist/main.js"]
+CMD ["/bin/sh", "./scripts/docker-start.sh"]

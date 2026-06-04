@@ -5,7 +5,7 @@
 #   docker compose -f docker-compose.prod.yml up -d --build
 #
 # Uses repo-root .env only (Compose loads it for build args and backend env_file).
-# After first up: migrations + seed inside backend container (see README).
+# Backend entrypoint runs generate + central migrate before each start (no seed).
 
 
 services:

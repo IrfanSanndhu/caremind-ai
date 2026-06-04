@@ -89,6 +89,10 @@ docker compose ps   # wait until healthy
 
 ### 3. Database migrations
 
+**Docker stack** (`docker compose up` in `backend/` or root prod compose): the backend container entrypoint runs Prisma generate + central `migrate deploy` before the API starts (each backend start/rebuild).
+
+**API on the host** (`npm run dev`):
+
 ```bash
 cd backend
 npm install
@@ -142,8 +146,7 @@ Override with `SEED_DEMO_PASSWORD` in `backend/.env`. Demo accounts cannot enabl
 
 ```bash
 cd backend
-docker compose up -d --build   # includes backend container
-npm run prisma:central:migrate # once, from host
+docker compose up -d --build   # backend runs migrations on start
 ```
 
 Use `SMTP_HOST=mailhog` in `.env` when the API runs inside Docker (see `backend/docker-compose.yml`).

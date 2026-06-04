@@ -84,7 +84,7 @@ services:
       - '1025:1025'
       - '8025:8025'
 
-  # ─── Backend (LiveKit: use LIVEKIT_* from .env — hosted/cloud, not a local container) ──
+  # ─── Backend (entrypoint: generate + central migrate, then API; no seed) ──
   backend:
     build:
       context: .
