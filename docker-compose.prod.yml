@@ -1,12 +1,10 @@
 # CareMind production stack (5 services: 2× Postgres, Redis, backend, frontend).
 #
 # SERVER (divescale nginx already running — network divescale-net must exist):
-#   docker compose --env-file .env.prod -f docker-compose.prod.yml up -d --build
+#   cp .env.example .env   # once, then fill secrets
+#   docker compose -f docker-compose.prod.yml up -d --build
 #
-# LOCAL Mac (no divescale stack): also add docker-compose.prod.local.yml OR:
-#   docker network create divescale-net
-#
-# Compose reads .env in project root automatically; --env-file .env.prod is explicit.
+# Uses repo-root .env only (Compose loads it for build args and backend env_file).
 # After first up: migrations + seed inside backend container (see README).
 
 
@@ -69,7 +67,6 @@ services:
     container_name: caremind-backend
     restart: unless-stopped
     env_file:
-      - .env.prod
       - .env
     environment:
       NODE_ENV: production

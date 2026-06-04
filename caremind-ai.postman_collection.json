@@ -2,7 +2,7 @@
   "info": {
     "_postman_id": "caremind-ai-mvp-collection",
     "name": "CareMind AI — MVP API",
-    "description": "End-to-end API collection for CareMind AI backend.\n\n**Recommended order**\n1. **1. Auth → Register Organization** — creates org, tenant DB, admin; saves tokens\n2. **2. Users (Admin) → Invite Doctor** (admin token)\n3. **1. Auth → Login (Doctor)** — set `doctorPassword` from invite email (Mailhog :8025)\n4. **2b. Users (Doctor) → Invite Patient** (doctor token) *or* **2. Invite Patient (Admin)**\n5. **1. Auth → Login (Patient)** — set `patientPassword` from invite email\n6. **3. Appointments** — create, consent (patient token)\n7. **4–8** — consultations, documents, AI, outputs, PDF, admin\n\n**Variables:** `baseUrl`, `accessToken`, `doctorAccessToken`, `patientAccessToken`, `doctorId`, `patientId`, etc.",
+    "description": "CareMind AI MVP API (backend).\n\n**Quick path (after `cd backend && npm run seed`):**\nSet `adminPassword`, `doctorPassword`, `patientPassword` to `seedDemoPassword` (default Demo123!). Run **Login (Admin/Doctor/Patient)** — skip register/invite. Demo @demo.clinic accounts cannot use MFA.\n\n**Full path**\n1. Register Organization → Invite Doctor → Login (Doctor) → Invite Patient (with `gender`) → Login (Patient)\n2. Appointments → consent (patient) → consultations → documents → AI → outputs → PDF → admin\n\n**Variables:** `baseUrl` (local `http://localhost:3000` or prod `https://caremind-ai.duckdns.org`). Upload uses form field `files` (array).",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "variable": [
@@ -13,11 +13,12 @@
     { "key": "patientAccessToken", "value": "" },
     { "key": "orgSlug", "value": "demo-clinic" },
     { "key": "adminEmail", "value": "admin@demo.clinic" },
-    { "key": "adminPassword", "value": "SecurePass123!" },
+    { "key": "adminPassword", "value": "Demo123!" },
+    { "key": "seedDemoPassword", "value": "Demo123!" },
     { "key": "doctorEmail", "value": "doctor@demo.clinic" },
-    { "key": "doctorPassword", "value": "" },
+    { "key": "doctorPassword", "value": "Demo123!" },
     { "key": "patientEmail", "value": "patient@demo.clinic" },
-    { "key": "patientPassword", "value": "" },
+    { "key": "patientPassword", "value": "Demo123!" },
     { "key": "doctorId", "value": "" },
     { "key": "patientId", "value": "" },
     { "key": "appointmentId", "value": "" },
@@ -225,6 +226,53 @@
             "header": [{ "key": "Authorization", "value": "Bearer {{accessToken}}" }],
             "url": "{{baseUrl}}/api/auth/logout"
           }
+        },
+        {
+          "name": "Get Me (Profile)",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{accessToken}}" }],
+            "url": "{{baseUrl}}/api/auth/me"
+          }
+        },
+        {
+          "name": "Change Password",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"currentPassword\": \"{{adminPassword}}\",\n  \"newPassword\": \"NewSecurePass123!\"\n}"
+            },
+            "url": "{{baseUrl}}/api/auth/change-password"
+          }
+        },
+        {
+          "name": "List Trusted Devices",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{accessToken}}" }],
+            "url": "{{baseUrl}}/api/auth/trusted-devices"
+          }
+        },
+        {
+          "name": "Register Trusted Device",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"deviceId\": \"00000000-0000-4000-8000-000000000001\"\n}"
+            },
+            "url": "{{baseUrl}}/api/auth/trusted-devices",
+            "description": "Requires MFA enabled; use a valid UUID for deviceId."
+          }
         }
       ]
     },
@@ -280,9 +328,17 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"email\": \"{{patientEmail}}\",\n  \"firstName\": \"John\",\n  \"lastName\": \"Doe\",\n  \"phone\": \"+15551234567\"\n}"
+              "raw": "{\n  \"email\": \"{{patientEmail}}\",\n  \"firstName\": \"John\",\n  \"lastName\": \"Doe\",\n  \"doctorId\": \"{{doctorId}}\",\n  \"gender\": \"prefer_not_to_say\",\n  \"phone\": \"+15551234567\"\n}"
             },
             "url": "{{baseUrl}}/api/users/invite-patient"
+          }
+        },
+        {
+          "name": "List Doctor Profiles",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{accessToken}}" }],
+            "url": "{{baseUrl}}/api/users/doctor-profiles"
           }
         },
         {
@@ -338,7 +394,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"email\": \"{{patientEmail}}\",\n  \"firstName\": \"John\",\n  \"lastName\": \"Doe\",\n  \"phone\": \"+15551234567\"\n}"
+              "raw": "{\n  \"email\": \"{{patientEmail}}\",\n  \"firstName\": \"John\",\n  \"lastName\": \"Doe\",\n  \"gender\": \"prefer_not_to_say\",\n  \"phone\": \"+15551234567\"\n}"
             },
             "url": "{{baseUrl}}/api/users/invite-patient"
           }
@@ -495,7 +551,8 @@
               "script": {
                 "exec": [
                   "const json = pm.response.json();",
-                  "if (json.data?.id) pm.collectionVariables.set('documentId', json.data.id);"
+                  "const docs = json.data?.documents;",
+                  "if (Array.isArray(docs) && docs[0]?.id) pm.collectionVariables.set('documentId', docs[0].id);"
                 ],
                 "type": "text/javascript"
               }
@@ -507,13 +564,13 @@
             "body": {
               "mode": "formdata",
               "formdata": [
-                { "key": "file", "type": "file", "src": [] },
+                { "key": "files", "type": "file", "src": [] },
                 { "key": "patientId", "value": "{{patientId}}", "type": "text" },
                 { "key": "documentType", "value": "lab_report", "type": "text" }
               ]
             },
             "url": "{{baseUrl}}/api/documents/upload",
-            "description": "Select a PDF, JPG, or PNG file in the form-data `file` field before sending."
+            "description": "Multipart field name must be `files` (add multiple file rows to upload batch). PDF, JPEG, or PNG; max 20MB each."
           }
         },
         {
@@ -539,6 +596,23 @@
             "method": "GET",
             "header": [{ "key": "Authorization", "value": "Bearer {{accessToken}}" }],
             "url": "{{baseUrl}}/api/documents/{{documentId}}"
+          }
+        },
+        {
+          "name": "Preview Document",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{accessToken}}" }],
+            "url": "{{baseUrl}}/api/documents/{{documentId}}/preview",
+            "description": "Returns raw file bytes (inline). Use Send and Download in Postman."
+          }
+        },
+        {
+          "name": "Reprocess Document",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Authorization", "value": "Bearer {{accessToken}}" }],
+            "url": "{{baseUrl}}/api/documents/{{documentId}}/reprocess"
           }
         },
         {
@@ -603,6 +677,22 @@
       "name": "7. AI Outputs (Doctor)",
       "item": [
         {
+          "name": "Generation Status",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{doctorAccessToken}}" }],
+            "url": "{{baseUrl}}/api/ai-outputs/appointment/{{appointmentId}}/generation-status"
+          }
+        },
+        {
+          "name": "Retry Generation",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Authorization", "value": "Bearer {{doctorAccessToken}}" }],
+            "url": "{{baseUrl}}/api/ai-outputs/appointment/{{appointmentId}}/retry-generation"
+          }
+        },
+        {
           "name": "List by Appointment",
           "event": [
             {
@@ -623,6 +713,21 @@
             "method": "GET",
             "header": [{ "key": "Authorization", "value": "Bearer {{doctorAccessToken}}" }],
             "url": "{{baseUrl}}/api/ai-outputs/appointment/{{appointmentId}}"
+          }
+        },
+        {
+          "name": "Save Output (Draft)",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{doctorAccessToken}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"content\": \"Edited draft content before approval.\"\n}"
+            },
+            "url": "{{baseUrl}}/api/ai-outputs/{{aiOutputId}}/save"
           }
         },
         {
@@ -705,6 +810,79 @@
             "method": "GET",
             "header": [{ "key": "Authorization", "value": "Bearer {{accessToken}}" }],
             "url": "{{baseUrl}}/api/admin/activity"
+          }
+        }
+      ]
+    },
+    {
+      "name": "10. Patients",
+      "item": [
+        {
+          "name": "List Patients",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{doctorAccessToken}}" }],
+            "url": {
+              "raw": "{{baseUrl}}/api/patients?page=1&limit=20",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "patients"],
+              "query": [
+                { "key": "page", "value": "1" },
+                { "key": "limit", "value": "20" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get Patient",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{doctorAccessToken}}" }],
+            "url": "{{baseUrl}}/api/patients/{{patientId}}"
+          }
+        },
+        {
+          "name": "Patient Sessions",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{doctorAccessToken}}" }],
+            "url": "{{baseUrl}}/api/patients/{{patientId}}/sessions?page=1&limit=20"
+          }
+        },
+        {
+          "name": "Reassign Primary Doctor (Admin)",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"doctorId\": \"{{doctorId}}\"\n}"
+            },
+            "url": "{{baseUrl}}/api/patients/{{patientId}}/primary-doctor"
+          }
+        }
+      ]
+    },
+    {
+      "name": "11. Dashboard",
+      "item": [
+        {
+          "name": "Doctor Dashboard",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{doctorAccessToken}}" }],
+            "url": "{{baseUrl}}/api/dashboard/doctor"
+          }
+        },
+        {
+          "name": "Patient Dashboard",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{patientAccessToken}}" }],
+            "url": "{{baseUrl}}/api/dashboard/patient"
           }
         }
       ]
