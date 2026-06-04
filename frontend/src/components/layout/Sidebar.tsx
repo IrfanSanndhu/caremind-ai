@@ -16,6 +16,7 @@ import {
 import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from '@/utils/cn';
 import { useAuthStore } from '@/stores/auth.store';
+import { useLogout } from '@/hooks/useLogout';
 import { useUIStore } from '@/stores/ui.store';
 import { Avatar } from '@/components/ui/Avatar';
 import { Tooltip } from '@/components/ui/Tooltip';
@@ -63,7 +64,8 @@ function Logo({ collapsed }: { collapsed: boolean }) {
 }
 
 export function Sidebar() {
-  const { user, logout } = useAuthStore();
+  const { user } = useAuthStore();
+  const logout = useLogout();
   const { sidebarCollapsed, toggleSidebar } = useUIStore();
   const location = useLocation();
 

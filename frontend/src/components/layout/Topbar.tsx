@@ -3,6 +3,7 @@ import { Menu, Bell, ChevronRight, LogOut, User } from 'lucide-react';
 import { getUserDisplayName } from '@/utils/display-name';
 import { useUIStore } from '@/stores/ui.store';
 import { useAuthStore } from '@/stores/auth.store';
+import { useLogout } from '@/hooks/useLogout';
 import { Avatar } from '@/components/ui/Avatar';
 import { Dropdown } from '@/components/ui/Dropdown';
 
@@ -22,7 +23,8 @@ function buildBreadcrumbs(pathname: string): { label: string; to: string }[] {
 
 export function Topbar() {
   const { toggleMobileSidebar } = useUIStore();
-  const { user, logout } = useAuthStore();
+  const { user } = useAuthStore();
+  const logout = useLogout();
   const location = useLocation();
   const navigate = useNavigate();
   const displayName = getUserDisplayName(user);

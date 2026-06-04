@@ -73,6 +73,7 @@ apiClient.interceptors.response.use(
 
       if (!store?.refreshToken) {
         store?.clearAuth();
+        window.location.replace('/login');
         return Promise.reject(error);
       }
 
@@ -102,6 +103,7 @@ apiClient.interceptors.response.use(
         return apiClient(originalRequest);
       } catch {
         store?.clearAuth();
+        window.location.replace('/login');
         return Promise.reject(error);
       } finally {
         isRefreshing = false;

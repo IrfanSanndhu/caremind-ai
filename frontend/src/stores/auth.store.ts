@@ -1,7 +1,14 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import type { User, UserRole } from '@/types';
+import { apiClient } from '@/api/client';
 import { exposeTokenForSSE } from '@/api/ai.api';
+import {
+  clearPersistedAuth,
+  clearReactQueryCache,
+  resetInMemorySessionState,
+} from '@/lib/session';
+import { useConsultationSessionStore } from './consultation-session.store';
 
 interface AuthState {
   user: User | null;
@@ -29,12 +36,18 @@ const initialState: AuthState = {
   orgId: null,
 };
 
+function wipeClientDataForUserSwitch(): void {
+  clearReactQueryCache();
+  useConsultationSessionStore.getState().endSession();
+}
+
 export const useAuthStore = create<AuthState & AuthActions>()(
   persist(
     (set) => ({
       ...initialState,
 
       login: (user, accessToken, refreshToken) => {
+        wipeClientDataForUserSwitch();
         exposeTokenForSSE(accessToken);
         set({
           user,
@@ -47,8 +60,12 @@ export const useAuthStore = create<AuthState & AuthActions>()(
       },
 
       logout: () => {
-        exposeTokenForSSE('');
+        void apiClient.post('/api/auth/logout').catch(() => {});
+        wipeClientDataForUserSwitch();
+        resetInMemorySessionState();
         set(initialState);
+        clearPersistedAuth();
+        useAuthStore.persist.clearStorage();
       },
 
       setTokens: (accessToken, refreshToken) => {
@@ -57,8 +74,11 @@ export const useAuthStore = create<AuthState & AuthActions>()(
       },
 
       clearAuth: () => {
-        exposeTokenForSSE('');
+        wipeClientDataForUserSwitch();
+        resetInMemorySessionState();
         set(initialState);
+        clearPersistedAuth();
+        useAuthStore.persist.clearStorage();
       },
 
       setUser: (user) => {
@@ -75,8 +95,8 @@ export const useAuthStore = create<AuthState & AuthActions>()(
         role: state.role,
         orgId: state.orgId,
       }),
-    }
-  )
+    },
+  ),
 );
 
 export function getAuthStoreSnapshot() {

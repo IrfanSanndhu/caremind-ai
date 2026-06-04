@@ -7,6 +7,7 @@ import { Drawer } from '@/components/ui/Drawer';
 import { useUIStore } from '@/stores/ui.store';
 import { navItems } from './Sidebar';
 import { useAuthStore } from '@/stores/auth.store';
+import { useLogout } from '@/hooks/useLogout';
 import { NavLink, useLocation } from 'react-router-dom';
 import { cn } from '@/utils/cn';
 import { Avatar } from '@/components/ui/Avatar';
@@ -16,7 +17,8 @@ import { getUserDisplayName } from '@/utils/display-name';
 
 function MobileDrawerNav() {
   const { sidebarOpen, closeMobileSidebar } = useUIStore();
-  const { user, logout } = useAuthStore();
+  const { user } = useAuthStore();
+  const logout = useLogout();
   const location = useLocation();
   const role = user?.role ?? 'patient';
   const displayName = getUserDisplayName(user);
@@ -73,6 +75,7 @@ function MobileDrawerNav() {
 
 export function AppShell() {
   const location = useLocation();
+  const userId = useAuthStore((s) => s.user?.id);
   useHydrateAuthProfile();
 
   return (
@@ -86,7 +89,7 @@ export function AppShell() {
         <main className="flex-1 overflow-y-auto pb-16 lg:pb-0">
           <AnimatePresence mode="wait">
             <motion.div
-              key={location.pathname}
+              key={`${userId ?? 'anon'}-${location.pathname}`}
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
