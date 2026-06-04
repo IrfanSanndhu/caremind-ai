@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
 import { useNavigate, Link, useLocation } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -11,6 +11,8 @@ import { getApiErrorMessage } from '@/api/errors';
 import { useAuthStore } from '@/stores/auth.store';
 import { hydrateAuthProfileAfterLogin } from '@/hooks/useAuthProfile';
 import { cn } from '@/utils/cn';
+import { getOrCreateDeviceId } from '@/lib/device';
+import { TrustDevicePromptModal } from './TrustDevicePromptModal';
 
 const loginSchema = z.object({
   email: z.string().email('Please enter a valid email'),
@@ -33,8 +35,23 @@ export function LoginPage() {
   const [mfaToken, setMfaToken] = useState('');
   const [loginEmail, setLoginEmail] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [rememberMe, setRememberMe] = useState(false);
+  const [trustPromptOpen, setTrustPromptOpen] = useState(false);
+  const [trustRegistering, setTrustRegistering] = useState(false);
+  const [postAuthPath, setPostAuthPath] = useState('/dashboard');
 
   const from = (location.state as { from?: { pathname: string } })?.from?.pathname ?? '/';
+
+  const resolvePostAuthPath = useCallback(() => {
+    return from !== '/' && from !== '/login' ? from : '/dashboard';
+  }, [from]);
+
+  const finishLogin = useCallback(
+    (path: string) => {
+      navigate(path, { replace: true });
+    },
+    [navigate],
+  );
 
   const { register, handleSubmit, formState: { errors } } = useForm<LoginFormValues>({
     resolver: zodResolver(loginSchema),
@@ -48,8 +65,15 @@ export function LoginPage() {
 
   const onSubmit = async (values: LoginFormValues) => {
     setIsLoading(true);
+    const remember = Boolean(values.rememberMe);
+    setRememberMe(remember);
     try {
-      const res = await authApi.login({ email: values.email, password: values.password });
+      const res = await authApi.login({
+        email: values.email,
+        password: values.password,
+        rememberMe: remember,
+        deviceId: getOrCreateDeviceId(),
+      });
       if (res.requiresMfa && res.mfaToken) {
         setLoginEmail(values.email);
         setMfaToken(res.mfaToken);
@@ -59,7 +83,7 @@ export function LoginPage() {
       if (res.user && res.accessToken && res.refreshToken) {
         login(res.user, res.accessToken, res.refreshToken);
         await hydrateAuthProfileAfterLogin();
-        navigate(from !== '/' && from !== '/login' ? from : '/dashboard', { replace: true });
+        finishLogin(resolvePostAuthPath());
         return;
       }
       toast.error('Unexpected response from server. Please try again.');
@@ -73,11 +97,16 @@ export function LoginPage() {
   const onMfaSubmit = async (values: MfaFormValues) => {
     setIsLoading(true);
     try {
-      const res = await authApi.verifyMfa({ mfaToken, code: values.code });
+      const res = await authApi.verifyMfa({
+        mfaToken,
+        code: values.code,
+        rememberMe,
+      });
       const user = { ...res.user, email: res.user.email || loginEmail };
       login(user, res.accessToken, res.refreshToken);
       await hydrateAuthProfileAfterLogin();
-      navigate('/dashboard', { replace: true });
+      setPostAuthPath(resolvePostAuthPath());
+      setTrustPromptOpen(true);
     } catch (err: unknown) {
       toast.error(getApiErrorMessage(err, 'Invalid MFA code'));
     } finally {
@@ -85,7 +114,25 @@ export function LoginPage() {
     }
   };
 
-  // Auto-submit MFA when 6 digits entered
+  const handleTrustYes = async () => {
+    setTrustRegistering(true);
+    try {
+      await authApi.registerTrustedDevice(getOrCreateDeviceId());
+      toast.success('This device is trusted for 30 days');
+      setTrustPromptOpen(false);
+      finishLogin(postAuthPath);
+    } catch (err: unknown) {
+      toast.error(getApiErrorMessage(err, 'Could not trust this device'));
+    } finally {
+      setTrustRegistering(false);
+    }
+  };
+
+  const handleTrustNo = () => {
+    setTrustPromptOpen(false);
+    finishLogin(postAuthPath);
+  };
+
   const handleMfaChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.value.length === 6) {
       handleMfaSubmit(onMfaSubmit)();
@@ -94,6 +141,13 @@ export function LoginPage() {
 
   return (
     <div className="min-h-screen flex">
+      <TrustDevicePromptModal
+        open={trustPromptOpen}
+        loading={trustRegistering}
+        onYes={handleTrustYes}
+        onNo={handleTrustNo}
+      />
+
       {/* Left Panel — hidden on mobile */}
       <div className="hidden lg:flex flex-col w-1/2 bg-gradient-to-br from-primary-600 via-primary to-secondary relative overflow-hidden">
         <div className="absolute inset-0 opacity-10">
@@ -140,7 +194,6 @@ export function LoginPage() {
       {/* Right Panel — Form */}
       <div className="flex-1 flex flex-col items-center justify-center p-6 bg-white">
         <div className="w-full max-w-sm">
-          {/* Mobile logo */}
           <div className="flex items-center justify-center gap-2 mb-8 lg:hidden">
             <div className="w-9 h-9 rounded-xl bg-primary flex items-center justify-center">
               <Activity className="w-5 h-5 text-white" />
@@ -184,16 +237,19 @@ export function LoginPage() {
                   {...register('password')}
                 />
 
-                <div className="flex items-center justify-between">
-                  <label className="flex items-center gap-2 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      className="w-4 h-4 rounded border-border text-primary focus:ring-primary/30"
-                      {...register('rememberMe')}
-                    />
-                    <span className="text-sm text-slate-700">Remember me</span>
-                  </label>
-                </div>
+                <label className="flex items-start gap-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    className="w-4 h-4 mt-0.5 rounded border-border text-primary focus:ring-primary/30"
+                    {...register('rememberMe')}
+                  />
+                  <span className="text-sm text-slate-700">
+                    Remember me
+                    <span className="block text-xs text-muted mt-0.5">
+                      Stay signed in for 5 days on this browser
+                    </span>
+                  </span>
+                </label>
 
                 <Button type="submit" className="w-full" size="lg" loading={isLoading}>
                   Sign in

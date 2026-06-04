@@ -1,10 +1,10 @@
 import { useState } from 'react';
-import { useMutation } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { QRCodeSVG } from 'qrcode.react';
-import { Shield, ShieldCheck, Key } from 'lucide-react';
+import { Shield, ShieldCheck, Key, Monitor, Trash2 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { Button, Card, CardHeader, Input, Badge, Skeleton } from '@/components/ui';
 import { PageHeader } from '@/components/layout/PageHeader';
@@ -14,6 +14,8 @@ import { getApiErrorMessage } from '@/api/errors';
 import { useAuthStore } from '@/stores/auth.store';
 import { getUserDisplayName } from '@/utils/display-name';
 import { hydrateAuthProfileAfterLogin } from '@/hooks/useAuthProfile';
+import { formatDateTime } from '@/utils/formatDate';
+import type { TrustedDevice } from '@/types';
 
 const passwordSchema = z
   .object({
@@ -30,6 +32,7 @@ type PasswordFormValues = z.infer<typeof passwordSchema>;
 
 export function ProfilePage() {
   const { user } = useAuthStore();
+  const queryClient = useQueryClient();
   const [mfaSetupOpen, setMfaSetupOpen] = useState(false);
   const [mfaCode, setMfaCode] = useState('');
   const [setupStep, setSetupStep] = useState<'qr' | 'verify'>('qr');
@@ -60,6 +63,21 @@ export function ProfilePage() {
       await hydrateAuthProfileAfterLogin();
     },
     onError: (err: unknown) => toast.error(getApiErrorMessage(err, 'Invalid code, please try again')),
+  });
+
+  const trustedDevicesQuery = useQuery({
+    queryKey: ['auth', 'trusted-devices'],
+    queryFn: authApi.listTrustedDevices,
+    enabled: Boolean(user?.mfaEnabled),
+  });
+
+  const revokeDeviceMutation = useMutation({
+    mutationFn: (id: string) => authApi.revokeTrustedDevice(id),
+    onSuccess: () => {
+      toast.success('Device removed');
+      void queryClient.invalidateQueries({ queryKey: ['auth', 'trusted-devices'] });
+    },
+    onError: (err: unknown) => toast.error(getApiErrorMessage(err, 'Failed to remove device')),
   });
 
   const changePasswordMutation = useMutation({
@@ -251,6 +269,57 @@ export function ProfilePage() {
           </div>
         )}
       </Card>
+
+      {user?.mfaEnabled && (
+        <Card className="mb-6">
+          <CardHeader
+            title="Trusted Devices"
+            subtitle="Devices that can skip MFA for 30 days after you choose Yes on the trust-device prompt"
+          />
+          {trustedDevicesQuery.isLoading ? (
+            <div className="space-y-2">
+              <Skeleton className="h-14 w-full" />
+              <Skeleton className="h-14 w-full" />
+            </div>
+          ) : trustedDevicesQuery.data?.length ? (
+            <ul className="divide-y divide-border rounded-lg border border-border overflow-hidden">
+              {trustedDevicesQuery.data.map((device: TrustedDevice) => (
+                <li
+                  key={device.id}
+                  className="flex items-center justify-between gap-3 px-4 py-3 bg-white"
+                >
+                  <div className="flex items-start gap-3 min-w-0">
+                    <Monitor className="w-5 h-5 text-muted flex-shrink-0 mt-0.5" />
+                    <div className="min-w-0">
+                      <p className="text-sm font-medium text-slate-900 truncate">{device.deviceName}</p>
+                      <p className="text-xs text-muted mt-0.5">
+                        {device.isActive
+                          ? `Trusted until ${formatDateTime(device.trustedUntil)}`
+                          : 'Expired'}
+                        {device.lastUsedAt && ` · Last used ${formatDateTime(device.lastUsedAt)}`}
+                      </p>
+                    </div>
+                  </div>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    leftIcon={<Trash2 className="w-4 h-4" />}
+                    onClick={() => revokeDeviceMutation.mutate(device.id)}
+                    loading={revokeDeviceMutation.isPending}
+                    aria-label={`Remove ${device.deviceName}`}
+                  >
+                    Remove
+                  </Button>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className="text-sm text-muted">
+              No trusted devices yet. After MFA at sign-in, choose Yes on the trust-device prompt to add this browser.
+            </p>
+          )}
+        </Card>
+      )}
 
       <Card>
         <CardHeader

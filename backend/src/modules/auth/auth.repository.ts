@@ -1,4 +1,6 @@
+import crypto from 'crypto';
 import type { PrismaClient as CentralPrisma } from '../../../node_modules/.prisma/central-client/index.js';
+import type { TrustedDevice } from '../../lib/prisma/central-prisma.types.js';
 import type { UserRole } from '../../types/auth.js';
 
 export async function findUserByEmail(prisma: CentralPrisma, email: string) {
@@ -91,4 +93,74 @@ export async function updatePasswordHash(
     where: { id: userId },
     data: { passwordHash },
   });
+}
+
+export async function findActiveTrustedDevice(
+  prisma: CentralPrisma,
+  userId: string,
+  deviceHash: string,
+) {
+  return prisma.trustedDevice.findFirst({
+    where: {
+      userId,
+      deviceHash,
+      trustedUntil: { gt: new Date() },
+    },
+  });
+}
+
+export async function upsertTrustedDevice(
+  prisma: CentralPrisma,
+  data: {
+    userId: string;
+    deviceHash: string;
+    deviceName: string;
+    trustedUntil: Date;
+  },
+) {
+  return prisma.trustedDevice.upsert({
+    where: {
+      userId_deviceHash: { userId: data.userId, deviceHash: data.deviceHash },
+    },
+    create: {
+      id: crypto.randomUUID(),
+      userId: data.userId,
+      deviceHash: data.deviceHash,
+      deviceName: data.deviceName,
+      trustedUntil: data.trustedUntil,
+      lastUsedAt: new Date(),
+    },
+    update: {
+      deviceName: data.deviceName,
+      trustedUntil: data.trustedUntil,
+      lastUsedAt: new Date(),
+    },
+  });
+}
+
+export async function touchTrustedDevice(prisma: CentralPrisma, id: string) {
+  return prisma.trustedDevice.update({
+    where: { id },
+    data: { lastUsedAt: new Date() },
+  });
+}
+
+export async function listTrustedDevices(
+  prisma: CentralPrisma,
+  userId: string,
+): Promise<TrustedDevice[]> {
+  return prisma.trustedDevice.findMany({
+    where: { userId },
+    orderBy: { lastUsedAt: 'desc' },
+  });
+}
+
+export async function findTrustedDeviceById(prisma: CentralPrisma, id: string, userId: string) {
+  return prisma.trustedDevice.findFirst({
+    where: { id, userId },
+  });
+}
+
+export async function deleteTrustedDevice(prisma: CentralPrisma, id: string) {
+  return prisma.trustedDevice.delete({ where: { id } });
 }

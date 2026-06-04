@@ -12,6 +12,8 @@ interface ModalProps {
   children: ReactNode;
   size?: 'sm' | 'md' | 'lg' | 'xl' | 'full';
   showCloseButton?: boolean;
+  /** When false, backdrop click and Escape do not close the modal. */
+  dismissible?: boolean;
   className?: string;
 }
 
@@ -31,17 +33,19 @@ export function Modal({
   children,
   size = 'md',
   showCloseButton = true,
+  dismissible = true,
   className,
 }: ModalProps) {
   const overlayRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
+    if (!dismissible) return;
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape' && open) onClose();
     };
     document.addEventListener('keydown', handleKeyDown);
     return () => document.removeEventListener('keydown', handleKeyDown);
-  }, [open, onClose]);
+  }, [open, onClose, dismissible]);
 
   useEffect(() => {
     if (open) {
@@ -55,7 +59,7 @@ export function Modal({
   }, [open]);
 
   const handleOverlayClick = (e: React.MouseEvent) => {
-    if (e.target === overlayRef.current) onClose();
+    if (dismissible && e.target === overlayRef.current) onClose();
   };
 
   return createPortal(

@@ -254,6 +254,8 @@ export interface ApiErrorBody {
 export interface LoginRequest {
   email: string;
   password: string;
+  rememberMe?: boolean;
+  deviceId?: string;
 }
 
 export interface LoginResponse {
@@ -267,6 +269,16 @@ export interface LoginResponse {
 export interface MfaVerifyRequest {
   mfaToken: string;
   code: string;
+  rememberMe?: boolean;
+}
+
+export interface TrustedDevice {
+  id: string;
+  deviceName: string;
+  trustedUntil: string;
+  lastUsedAt: string | null;
+  createdAt: string;
+  isActive: boolean;
 }
 
 export interface RegisterOrgRequest {

@@ -65,9 +65,12 @@ export function issueAccessToken(payload: Omit<JwtPayload, 'iat' | 'exp'>): stri
   } as jwt.SignOptions);
 }
 
-export function issueRefreshToken(userId: string): string {
+export function issueRefreshToken(
+  userId: string,
+  expiresIn: string | number = env.REFRESH_TOKEN_EXPIRES_IN,
+): string {
   return jwt.sign({ sub: userId }, env.REFRESH_TOKEN_SECRET, {
-    expiresIn: env.REFRESH_TOKEN_EXPIRES_IN,
+    expiresIn,
   } as jwt.SignOptions);
 }
 

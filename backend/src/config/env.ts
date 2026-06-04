@@ -37,7 +37,7 @@ const envSchema = z
     JWT_SECRET: z.string().min(32),
     JWT_EXPIRES_IN: z.string().default('15m'),
     REFRESH_TOKEN_SECRET: z.string().min(32),
-    REFRESH_TOKEN_EXPIRES_IN: z.string().default('7d'),
+    REFRESH_TOKEN_EXPIRES_IN: z.string().default('5d'),
 
     // AI — OpenRouter (MVP)
     OPENROUTER_API_KEY: z.string().min(1),

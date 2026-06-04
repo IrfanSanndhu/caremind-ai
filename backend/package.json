@@ -9,7 +9,7 @@
     "start": "node dist/main.js",
     "dev": "ts-node-dev --respawn --transpile-only src/main.ts",
     "prisma:central:migrate": "bash scripts/prisma-central-migrate.sh",
-    "prisma:central:generate": "prisma generate --schema=prisma/central/schema.prisma",
+    "prisma:central:generate": "bash scripts/prisma-central-generate.sh",
     "prisma:tenant:generate": "prisma generate --schema=prisma/tenant/schema.prisma",
     "lint": "eslint src --ext .ts",
     "type-check": "tsc --noEmit"

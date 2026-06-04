@@ -39,11 +39,28 @@ model User {
   createdAt     DateTime     @default(now())
   lastLoginAt   DateTime?
 
-  organization  Organization @relation(fields: [orgId], references: [id])
-  refreshTokens RefreshToken[]
+  organization   Organization    @relation(fields: [orgId], references: [id])
+  refreshTokens  RefreshToken[]
+  trustedDevices TrustedDevice[]
 
   @@index([orgId])
   @@map("users")
+}
+
+model TrustedDevice {
+  id           String   @id @default(uuid())
+  userId       String
+  deviceHash   String
+  deviceName   String
+  trustedUntil DateTime
+  lastUsedAt   DateTime?
+  createdAt    DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, deviceHash])
+  @@index([userId])
+  @@map("trusted_devices")
 }
 
 model RefreshToken {

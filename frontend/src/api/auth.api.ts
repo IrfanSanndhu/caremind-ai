@@ -8,6 +8,7 @@ import type {
   User,
   MfaSetupResponse,
   UserRole,
+  TrustedDevice,
 } from '@/types';
 
 export interface AuthMeResponse {
@@ -42,6 +43,7 @@ function mapMeToUser(data: AuthMeResponse): User {
 interface BackendTokenPair {
   accessToken: string;
   refreshToken: string;
+  promptTrustDevice?: boolean;
 }
 
 /** Backend MFA challenge */
@@ -85,6 +87,7 @@ export const authApi = {
     const res = await apiClient.post('/api/auth/mfa/verify', {
       code: payload.code,
       tempToken: payload.mfaToken,
+      rememberMe: payload.rememberMe ?? false,
     });
     const data = unwrap(res) as BackendTokenPair;
     if (!isTokenPair(data)) {
@@ -140,6 +143,20 @@ export const authApi = {
     newPassword: string;
   }): Promise<void> => {
     await apiClient.post('/api/auth/change-password', payload);
+  },
+
+  registerTrustedDevice: async (deviceId: string): Promise<{ trustedUntil: string }> => {
+    const res = await apiClient.post('/api/auth/trusted-devices', { deviceId });
+    return unwrap(res) as { success: boolean; trustedUntil: string };
+  },
+
+  listTrustedDevices: async (): Promise<TrustedDevice[]> => {
+    const res = await apiClient.get('/api/auth/trusted-devices');
+    return unwrap(res) as TrustedDevice[];
+  },
+
+  revokeTrustedDevice: async (deviceId: string): Promise<void> => {
+    await apiClient.delete(`/api/auth/trusted-devices/${deviceId}`);
   },
 };
 

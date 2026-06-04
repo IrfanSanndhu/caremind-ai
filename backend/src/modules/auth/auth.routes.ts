@@ -12,6 +12,8 @@ import {
   mfaVerifySchema,
   mfaSetupVerifySchema,
   changePasswordSchema,
+  trustedDeviceIdParamSchema,
+  registerTrustedDeviceSchema,
 } from './auth.schema.js';
 import { v4 as uuidv4 } from 'uuid';
 
@@ -35,7 +37,7 @@ authRoutes.post(
   authRateLimiter,
   validate({ body: loginSchema }),
   asyncHandler(async (req, res) => {
-    const result = await service.login(req.body);
+    const result = await service.login(req.body, req.headers['user-agent']);
     res.json({
       data: result,
       meta: { requestId: uuidv4(), timestamp: new Date().toISOString() },
@@ -111,7 +113,49 @@ authRoutes.post(
   authRateLimiter,
   validate({ body: mfaVerifySchema }),
   asyncHandler(async (req, res) => {
-    const result = await service.verifyMfa(req.body.code, req.body.tempToken);
+    const result = await service.verifyMfa(req.body, req.headers['user-agent']);
+    res.json({
+      data: result,
+      meta: { requestId: uuidv4(), timestamp: new Date().toISOString() },
+    });
+  }),
+);
+
+authRoutes.post(
+  '/trusted-devices',
+  authenticate,
+  validate({ body: registerTrustedDeviceSchema }),
+  asyncHandler(async (req, res) => {
+    const result = await service.registerTrustedDevice(
+      req.auth.userId,
+      req.body.deviceId,
+      req.headers['user-agent'],
+    );
+    res.status(201).json({
+      data: result,
+      meta: { requestId: uuidv4(), timestamp: new Date().toISOString() },
+    });
+  }),
+);
+
+authRoutes.get(
+  '/trusted-devices',
+  authenticate,
+  asyncHandler(async (req, res) => {
+    const result = await service.listTrustedDevices(req.auth.userId);
+    res.json({
+      data: result,
+      meta: { requestId: uuidv4(), timestamp: new Date().toISOString() },
+    });
+  }),
+);
+
+authRoutes.delete(
+  '/trusted-devices/:id',
+  authenticate,
+  validate({ params: trustedDeviceIdParamSchema }),
+  asyncHandler(async (req, res) => {
+    const result = await service.revokeTrustedDevice(req.auth.userId, req.params.id);
     res.json({
       data: result,
       meta: { requestId: uuidv4(), timestamp: new Date().toISOString() },
