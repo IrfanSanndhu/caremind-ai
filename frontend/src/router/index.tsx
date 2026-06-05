@@ -36,15 +36,15 @@ import { AuditLogsPage } from '@/features/admin/AuditLogsPage';
 // Profile
 import { ProfilePage } from '@/features/auth/ProfilePage';
 
-// Root redirect
-import { RoleRedirect } from './RoleRedirect';
+// Landing
+import { LandingPage } from '@/landing-page/LandingPage';
 
 export const router = createBrowserRouter([
   {
     path: '/',
     errorElement: <ErrorBoundary><div /></ErrorBoundary>,
     children: [
-      { index: true, element: <RoleRedirect /> },
+      { index: true, element: <LandingPage /> },
       { path: 'login', element: <LoginPage /> },
       { path: 'register', element: <RegisterPage /> },
       {
