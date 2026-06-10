@@ -1,6 +1,12 @@
 import { z } from 'zod';
 import dotenv from 'dotenv';
 import { buildPostgresUrl } from './database-url.js';
+import {
+  llmEnvFields,
+  refineLlmEnv,
+  resolveLlmConfig,
+  type LlmProvider,
+} from './llm-env.js';
 
 dotenv.config();
 
@@ -45,10 +51,8 @@ const envSchema = z
     REFRESH_TOKEN_SECRET: z.string().min(32),
     REFRESH_TOKEN_EXPIRES_IN: z.string().default('5d'),
 
-    // AI — OpenRouter (MVP)
-    OPENROUTER_API_KEY: z.string().min(1),
-    OPENROUTER_BASE_URL: z.string().url().default('https://openrouter.ai/api/v1'),
-    OPENROUTER_MODEL: z.string().default('anthropic/claude-3.5-sonnet'),
+    // AI — multi-provider (LLM_* preferred; OPENROUTER_* legacy)
+    ...llmEnvFields,
 
     // Embeddings — Voyage AI (MVP)
     VOYAGE_API_KEY: z.string().min(1),
@@ -78,6 +82,8 @@ const envSchema = z
     FRONTEND_URL: z.string().url(),
   })
   .superRefine((data, ctx) => {
+    refineLlmEnv(data, ctx);
+
     if (!data.S3_ENDPOINT) {
       if (!data.MINIO_ENDPOINT?.length) {
         ctx.addIssue({
@@ -136,11 +142,25 @@ type EnvInput = z.infer<typeof envSchema>;
 
 export type Env = Omit<
   EnvInput,
-  'MINIO_ACCESS_KEY' | 'MINIO_SECRET_KEY' | 'AWS_ACCESS_KEY_ID' | 'AWS_SECRET_ACCESS_KEY'
+  | 'MINIO_ACCESS_KEY'
+  | 'MINIO_SECRET_KEY'
+  | 'AWS_ACCESS_KEY_ID'
+  | 'AWS_SECRET_ACCESS_KEY'
+  | 'LLM_PROVIDER'
+  | 'LLM_API_KEY'
+  | 'LLM_MODEL'
+  | 'LLM_BASE_URL'
+  | 'OPENROUTER_API_KEY'
+  | 'OPENROUTER_BASE_URL'
+  | 'OPENROUTER_MODEL'
 > & {
   CENTRAL_DATABASE_URL: string;
   MINIO_ACCESS_KEY: string;
   MINIO_SECRET_KEY: string;
+  LLM_PROVIDER: LlmProvider;
+  LLM_API_KEY: string;
+  LLM_MODEL: string;
+  LLM_BASE_URL?: string;
 };
 
 let _env: Env;
@@ -167,11 +187,20 @@ export function validateEnv(): Env {
   const accessKey = result.data.MINIO_ACCESS_KEY ?? result.data.AWS_ACCESS_KEY_ID ?? '';
   const secretKey = result.data.MINIO_SECRET_KEY ?? result.data.AWS_SECRET_ACCESS_KEY ?? '';
 
+  const llm = resolveLlmConfig(result.data);
+  if (!llm) {
+    throw new Error('LLM configuration could not be resolved');
+  }
+
   _env = {
     ...result.data,
     MINIO_ACCESS_KEY: accessKey,
     MINIO_SECRET_KEY: secretKey,
     CENTRAL_DATABASE_URL: centralDatabaseUrl,
+    LLM_PROVIDER: llm.provider,
+    LLM_API_KEY: llm.apiKey,
+    LLM_MODEL: llm.model,
+    LLM_BASE_URL: llm.baseUrl,
   };
   return _env;
 }

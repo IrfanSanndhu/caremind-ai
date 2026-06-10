@@ -5,7 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Button } from '@/components/ui';
 import { useAuthStore } from '@/stores/auth.store';
 import { cn } from '@/utils/cn';
-import { NAV_LINKS } from '../landing-content';
+import { NAV_LINKS, NAV_PAGE_LINKS } from '../landing-content';
 import { scrollToPageTop } from '../scroll-to-top';
 
 export function LandingNavbar() {
@@ -59,11 +59,20 @@ export function LandingNavbar() {
             {NAV_LINKS.map((link) => (
               <a
                 key={link.href}
-                href={link.href}
+                href={location.pathname === '/' ? link.href : `/${link.href}`}
                 className="text-sm font-medium text-slate-600 hover:text-primary transition-colors"
               >
                 {link.label}
               </a>
+            ))}
+            {NAV_PAGE_LINKS.map((link) => (
+              <Link
+                key={link.to}
+                to={link.to}
+                className="text-sm font-medium text-slate-600 hover:text-primary transition-colors"
+              >
+                {link.label}
+              </Link>
             ))}
           </nav>
 
@@ -111,12 +120,22 @@ export function LandingNavbar() {
               {NAV_LINKS.map((link) => (
                 <a
                   key={link.href}
-                  href={link.href}
+                  href={location.pathname === '/' ? link.href : `/${link.href}`}
                   onClick={closeMobile}
                   className="px-3 py-2.5 rounded-lg text-base font-medium text-slate-700 hover:bg-surface"
                 >
                   {link.label}
                 </a>
+              ))}
+              {NAV_PAGE_LINKS.map((link) => (
+                <Link
+                  key={link.to}
+                  to={link.to}
+                  onClick={closeMobile}
+                  className="px-3 py-2.5 rounded-lg text-base font-medium text-slate-700 hover:bg-surface"
+                >
+                  {link.label}
+                </Link>
               ))}
               <div className="pt-3 mt-2 border-t border-border flex flex-col gap-2">
                 {isAuthenticated ? (

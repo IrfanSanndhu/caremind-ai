@@ -1,10 +1,11 @@
 import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { ArrowRight, Play, ShieldCheck } from 'lucide-react';
+import { ArrowRight, ShieldCheck } from 'lucide-react';
 import { Button } from '@/components/ui';
 import { useAuthStore } from '@/stores/auth.store';
 import { HERO_STATS } from '../landing-content';
 import { LandingProductPreview } from './LandingProductPreview';
+import { SelfHostHeroCta } from './SelfHostHeroCta';
 
 export function LandingHero() {
   const { isAuthenticated } = useAuthStore();
@@ -47,25 +48,27 @@ export function LandingHero() {
                 consent-first recording.
               </p>
 
-              <div className="mt-8 flex flex-col sm:flex-row gap-3">
+              <div className="mt-8 flex flex-col gap-4">
                 {isAuthenticated ? (
-                  <Link to="/dashboard">
+                  <Link to="/dashboard" className="w-fit">
                     <Button size="lg" rightIcon={<ArrowRight className="w-5 h-5" />}>
                       Open App
                     </Button>
                   </Link>
                 ) : (
                   <>
-                    <Link to="/register">
-                      <Button size="lg" rightIcon={<ArrowRight className="w-5 h-5" />}>
-                        Get started free
-                      </Button>
-                    </Link>
-                    <a href="#how-it-works">
-                      <Button size="lg" variant="outline" leftIcon={<Play className="w-4 h-4" />}>
-                        See how it works
-                      </Button>
-                    </a>
+                    <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+                      <Link to="/register" className="w-full sm:w-auto">
+                        <Button
+                          size="lg"
+                          className="w-full sm:w-auto"
+                          rightIcon={<ArrowRight className="w-5 h-5" />}
+                        >
+                          Get started free
+                        </Button>
+                      </Link>
+                    </div>
+                    <SelfHostHeroCta />
                   </>
                 )}
               </div>

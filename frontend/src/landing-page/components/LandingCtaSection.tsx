@@ -27,8 +27,8 @@ export function LandingCtaSection() {
               Ready to transform your clinic?
             </h2>
             <p className="mt-4 text-lg text-white/85 max-w-2xl mx-auto">
-              Register your HIPAA-grade clinic in minutes. Invite your team and deliver
-              AI-assisted care with audit trails, consent controls, and clinical oversight.
+              Register your HIPAA-grade clinic in minutes, or deploy CareMind in your own VPC
+              with our one-command installer — PHI stays on your infrastructure.
             </p>
             <div className="mt-8 flex flex-col sm:flex-row gap-3 justify-center">
               <Link to={isAuthenticated ? '/dashboard' : '/register'}>
@@ -41,15 +41,26 @@ export function LandingCtaSection() {
                 </Button>
               </Link>
               {!isAuthenticated && (
-                <Link to="/login">
-                  <Button
-                    size="lg"
-                    variant="outline"
-                    className="border-white/40 text-white hover:bg-white/10 bg-transparent"
-                  >
-                    Sign in to existing account
-                  </Button>
-                </Link>
+                <>
+                  <Link to="/self-host">
+                    <Button
+                      size="lg"
+                      variant="outline"
+                      className="border-white/40 text-white hover:bg-white/10 bg-transparent"
+                    >
+                      Self-host guide
+                    </Button>
+                  </Link>
+                  <Link to="/login">
+                    <Button
+                      size="lg"
+                      variant="outline"
+                      className="border-white/40 text-white hover:bg-white/10 bg-transparent"
+                    >
+                      Sign in
+                    </Button>
+                  </Link>
+                </>
               )}
             </div>
           </div>

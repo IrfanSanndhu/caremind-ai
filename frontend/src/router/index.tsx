@@ -38,6 +38,7 @@ import { ProfilePage } from '@/features/auth/ProfilePage';
 
 // Landing
 import { LandingPage } from '@/landing-page/LandingPage';
+import { SelfHostPage } from '@/landing-page/self-host/SelfHostPage';
 
 export const router = createBrowserRouter([
   {
@@ -45,6 +46,7 @@ export const router = createBrowserRouter([
     errorElement: <ErrorBoundary><div /></ErrorBoundary>,
     children: [
       { index: true, element: <LandingPage /> },
+      { path: 'self-host', element: <SelfHostPage /> },
       { path: 'login', element: <LoginPage /> },
       { path: 'register', element: <RegisterPage /> },
       {

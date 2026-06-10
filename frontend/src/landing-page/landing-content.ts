@@ -21,6 +21,10 @@ export const NAV_LINKS = [
   { label: 'Security', href: '#security' },
 ] as const;
 
+export const NAV_PAGE_LINKS = [
+  { label: 'Self-host', to: '/self-host' },
+] as const;
+
 export const HERO_STATS = [
   { value: 'HIPAA', label: 'Grade architecture' },
   { value: '100%', label: 'Audit-logged PHI access' },

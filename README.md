@@ -176,7 +176,8 @@ See `backend/.env.example` for the full list. Highlights:
 | `REDIS_URL` | `redis://localhost:6379` on host; `redis://redis:6379` in backend container |
 | `MINIO_*` | Local MinIO on port 9000 |
 | `JWT_*` / `REFRESH_TOKEN_*` | Access and refresh tokens (separate secrets) |
-| `OPENROUTER_*` / `VOYAGE_*` / `DEEPGRAM_*` | AI vendors |
+| `LLM_PROVIDER` / `LLM_API_KEY` / `LLM_MODEL` | AI chat (openrouter, openai, anthropic, google) |
+| `VOYAGE_*` / `DEEPGRAM_*` | Embeddings and speech-to-text |
 | `LIVEKIT_*` | Hosted video |
 
 ---
@@ -212,6 +213,47 @@ Responses: `{ "data": ..., "meta": { "requestId", "timestamp" } }`.
 | LiveKit errors | `LIVEKIT_URL` uses `wss://`; keys match your cloud project |
 | CORS in browser | `FRONTEND_URL=http://localhost:5173` in `backend/.env` |
 | Invite patient 400 | Body must include `gender` and (for admin) `doctorId` |
+
+---
+
+## Self-hosted deployment (your VPC)
+
+Run CareMind on your own EC2 or Linux server with Docker, bundled MinIO, Caddy (HTTPS), and multi-tenant isolation.
+
+### Before you start
+
+Gather API keys and credentials — see the interactive guide at **`/self-host`** in the frontend, or read `caremind-deploy-bundle/deploy/env.template` in the public install repo.
+
+You will need: domain + DNS A record, LLM provider key, Voyage, Deepgram, LiveKit, and email (Resend or SMTP).
+
+### Install
+
+```bash
+# On your server (Ubuntu 22.04+ or Amazon Linux 2023, 8 GB RAM recommended)
+curl -fsSL https://raw.githubusercontent.com/divescale/caremind-deploy-bundle/master/deploy/install.sh | sudo bash
+```
+
+The installer will:
+
+1. Download deploy config to `/opt/caremind-ai` (compose, Caddyfile — no app source)
+2. Pull `divescale/caremind-backend` and `divescale/caremind-frontend` from Docker Hub
+3. Install Docker if missing
+4. Prompt for domain, keys, DB passwords, LLM provider, email, etc.
+5. Write `.env` and start the stack
+
+**Test before publishing images:** see `deploy/TESTING.md`
+
+**Publish images:** `docker login && ./deploy/build-images.sh 1.0.0 --push`
+
+After install, open `https://your-domain/register` to create the first organization.
+
+### Manage
+
+```bash
+cd /opt/caremind-ai
+docker compose -f docker-compose.customer.yml logs -f
+docker compose -f docker-compose.customer.yml up -d   # after .env changes
+```
 
 ---
 

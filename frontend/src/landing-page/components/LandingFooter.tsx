@@ -1,6 +1,6 @@
 import { Link, useLocation } from 'react-router-dom';
 import { Activity } from 'lucide-react';
-import { NAV_LINKS } from '../landing-content';
+import { NAV_LINKS, NAV_PAGE_LINKS } from '../landing-content';
 import { scrollToPageTop } from '../scroll-to-top';
 
 export function LandingFooter() {
@@ -35,11 +35,20 @@ export function LandingFooter() {
             {NAV_LINKS.map((link) => (
               <a
                 key={link.href}
-                href={link.href}
+                href={location.pathname === '/' ? link.href : `/${link.href}`}
                 className="text-sm text-muted hover:text-primary transition-colors"
               >
                 {link.label}
               </a>
+            ))}
+            {NAV_PAGE_LINKS.map((link) => (
+              <Link
+                key={link.to}
+                to={link.to}
+                className="text-sm text-muted hover:text-primary transition-colors"
+              >
+                {link.label}
+              </Link>
             ))}
             <Link to="/login" className="text-sm text-muted hover:text-primary transition-colors">
               Sign in
