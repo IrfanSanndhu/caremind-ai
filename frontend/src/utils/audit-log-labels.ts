@@ -7,6 +7,7 @@ const ACTION_VARIANT: Record<string, 'primary' | 'success' | 'warning' | 'danger
   APPROVE_OUTPUT: 'success',
   RECORD_CONSENT: 'success',
   INVITE_USER: 'primary',
+  RESEND_LOGIN: 'primary',
   JOIN_CONSULTATION: 'primary',
   START_RECORDING: 'warning',
   STOP_RECORDING: 'warning',

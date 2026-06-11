@@ -15,6 +15,7 @@ export type AuditAction =
   | 'STOP_RECORDING'
   | 'RECORD_CONSENT'
   | 'INVITE_USER'
+  | 'RESEND_LOGIN'
   | 'DELETE_USER'
   | 'REGISTER_ORG'
   | 'LOGIN'

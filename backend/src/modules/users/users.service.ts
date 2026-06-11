@@ -6,6 +6,7 @@ import type { PrismaClient as TenantPrisma } from '../../../node_modules/.prisma
 import * as repo from './users.repository.js';
 import { getEmailAdapter } from '../../adapters/email/index.js';
 import { auditLog } from '../../core/audit-logger.js';
+import { logger } from '../../config/logger.js';
 import { ConflictError, ForbiddenError, NotFoundError } from '../../core/errors.js';
 import type { AuthContext } from '../../types/auth.js';
 import type { InviteDoctorInput, InvitePatientInput } from './users.schema.js';
@@ -14,6 +15,41 @@ const BCRYPT_ROUNDS = 12;
 
 function generateTempPassword(): string {
   return crypto.randomBytes(16).toString('base64url');
+}
+
+async function sendLoginDetailsEmail(params: {
+  to: string;
+  firstName: string;
+  lastName?: string;
+  role: 'doctor' | 'patient';
+  tempPassword: string;
+  resent?: boolean;
+}) {
+  const email = getEmailAdapter();
+  const greeting =
+    params.role === 'doctor'
+      ? `Dr. ${params.firstName}${params.lastName ? ` ${params.lastName}` : ''}`
+      : params.firstName;
+  const subject = params.resent
+    ? 'Your CareMind AI login details'
+    : params.role === 'doctor'
+      ? 'You have been invited to CareMind AI'
+      : 'Welcome to CareMind AI';
+  const intro = params.resent
+    ? `Hi ${greeting}, here are your updated login details for CareMind AI.`
+    : params.role === 'doctor'
+      ? `Welcome ${greeting}.`
+      : `Welcome ${greeting}.`;
+
+  await email
+    .send({
+      to: params.to,
+      subject,
+      html: `<p>${intro} Your temporary password is: <strong>${params.tempPassword}</strong>. Please log in and change it.</p>`,
+    })
+    .catch((err) => {
+      logger.warn({ err, to: params.to }, 'Failed to send login details email');
+    });
 }
 
 export async function inviteDoctor(
@@ -44,12 +80,13 @@ export async function inviteDoctor(
     licenseNumber: input.licenseNumber,
   });
 
-  const email = getEmailAdapter();
-  await email.send({
+  await sendLoginDetailsEmail({
     to: input.email,
-    subject: 'You have been invited to CareMind AI',
-    html: `<p>Welcome Dr. ${input.firstName} ${input.lastName}. Your temporary password is: <strong>${tempPassword}</strong>. Please log in and change it.</p>`,
-  }).catch(() => { /* non-blocking */ });
+    firstName: input.firstName,
+    lastName: input.lastName,
+    role: 'doctor',
+    tempPassword,
+  });
 
   await auditLog({
     tenantPrisma,
@@ -107,12 +144,12 @@ export async function invitePatient(
     phone: input.phone,
   });
 
-  const email = getEmailAdapter();
-  await email.send({
+  await sendLoginDetailsEmail({
     to: input.email,
-    subject: 'Welcome to CareMind AI',
-    html: `<p>Welcome ${input.firstName}. Your temporary password is: <strong>${tempPassword}</strong>.</p>`,
-  }).catch(() => { /* non-blocking */ });
+    firstName: input.firstName,
+    role: 'patient',
+    tempPassword,
+  });
 
   await auditLog({
     tenantPrisma,
@@ -124,6 +161,80 @@ export async function invitePatient(
   });
 
   return { userId, patientId };
+}
+
+export async function resendLoginDetails(
+  auth: AuthContext,
+  tenantPrisma: TenantPrisma,
+  targetUserId: string,
+) {
+  const central = getCentralPrisma();
+  const user = await repo.findCentralUserById(central, targetUserId);
+
+  if (!user || user.orgId !== auth.orgId || user.deletedAt) {
+    throw new NotFoundError('User not found');
+  }
+  if (user.role === 'admin') {
+    throw new ForbiddenError('Cannot resend login details for admin accounts');
+  }
+  if (auth.role === 'doctor' && user.role !== 'patient') {
+    throw new ForbiddenError('Doctors can only resend login details for patients');
+  }
+
+  let firstName = user.email;
+  let lastName: string | undefined;
+  let resourceType: 'Doctor' | 'Patient';
+  let resourceId: string;
+
+  if (user.role === 'doctor') {
+    const doctor = await repo.findDoctorByUserId(tenantPrisma, targetUserId);
+    if (!doctor || doctor.orgId !== auth.orgId || doctor.deletedAt) {
+      throw new NotFoundError('Doctor profile not found');
+    }
+    firstName = doctor.firstName;
+    lastName = doctor.lastName;
+    resourceType = 'Doctor';
+    resourceId = doctor.id;
+  } else {
+    const patient = await repo.findPatientByUserId(tenantPrisma, targetUserId);
+    if (!patient || patient.orgId !== auth.orgId || patient.deletedAt) {
+      throw new NotFoundError('Patient profile not found');
+    }
+    if (auth.role === 'doctor') {
+      const doctor = await repo.findDoctorByUserId(tenantPrisma, auth.userId);
+      if (!doctor || patient.primaryDoctorId !== doctor.id) {
+        throw new ForbiddenError('You can only resend login details for your assigned patients');
+      }
+    }
+    firstName = patient.firstName;
+    lastName = patient.lastName;
+    resourceType = 'Patient';
+    resourceId = patient.id;
+  }
+
+  const tempPassword = generateTempPassword();
+  const passwordHash = await bcrypt.hash(tempPassword, BCRYPT_ROUNDS);
+  await repo.updateUserPassword(central, targetUserId, passwordHash);
+
+  await sendLoginDetailsEmail({
+    to: user.email,
+    firstName,
+    lastName,
+    role: user.role as 'doctor' | 'patient',
+    tempPassword,
+    resent: true,
+  });
+
+  await auditLog({
+    tenantPrisma,
+    userId: auth.userId,
+    orgId: auth.orgId,
+    action: 'RESEND_LOGIN',
+    resourceType,
+    resourceId,
+  });
+
+  return { success: true };
 }
 
 export async function listUsers(

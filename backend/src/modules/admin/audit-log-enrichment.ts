@@ -24,6 +24,7 @@ const ACTION_VERBS: Record<string, string> = {
   STOP_RECORDING: 'Stopped recording for',
   RECORD_CONSENT: 'Recorded consent on',
   INVITE_USER: 'Invited',
+  RESEND_LOGIN: 'Resent login details to',
   DELETE_USER: 'Removed',
   REGISTER_ORG: 'Registered organization',
   LOGIN: 'Signed in',

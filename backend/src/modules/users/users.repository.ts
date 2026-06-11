@@ -111,6 +111,24 @@ export async function listPatientAssignmentsByOrg(tenantPrisma: TenantPrisma, or
   );
 }
 
+export async function updateUserPassword(
+  centralPrisma: CentralPrisma,
+  userId: string,
+  passwordHash: string,
+) {
+  return centralPrisma.user.update({
+    where: { id: userId },
+    data: { passwordHash },
+  });
+}
+
+export async function findCentralUserById(centralPrisma: CentralPrisma, userId: string) {
+  return centralPrisma.user.findUnique({
+    where: { id: userId },
+    select: { id: true, email: true, role: true, orgId: true, deletedAt: true },
+  });
+}
+
 export async function softDeleteUser(centralPrisma: CentralPrisma, userId: string) {
   return centralPrisma.user.update({
     where: { id: userId },

@@ -18,6 +18,8 @@ import { getApiErrorMessage } from '@/api/errors';
 import { patientsApi, patientKeys, formatGender } from '@/api/patients.api';
 import { usersApi, userKeys } from '@/api/users.api';
 import { formatDate, formatDateTime } from '@/utils/formatDate';
+import { ResendLoginDetailsButton } from '@/features/users/ResendLoginDetailsButton';
+import { UserRole } from '@/types';
 
 export function PatientDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -85,14 +87,23 @@ export function PatientDetailPage() {
           </h1>
           <p className="text-muted mt-1">{patient.sessionCount ?? 0} total sessions</p>
         </div>
-        <Button
-          variant="outline"
-          size="sm"
-          leftIcon={<Trash2 className="w-4 h-4" />}
-          onClick={() => setConfirmDelete(true)}
-        >
-          Remove Patient
-        </Button>
+        <div className="flex flex-wrap gap-2">
+          <ResendLoginDetailsButton
+            userId={patient.userId}
+            userLabel={patient.email}
+            targetRole={UserRole.PATIENT}
+            variant="button"
+            size="sm"
+          />
+          <Button
+            variant="outline"
+            size="sm"
+            leftIcon={<Trash2 className="w-4 h-4" />}
+            onClick={() => setConfirmDelete(true)}
+          >
+            Remove Patient
+          </Button>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

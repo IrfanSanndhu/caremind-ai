@@ -110,9 +110,8 @@ services:
       MINIO_ENDPOINT: minio
       MINIO_PORT: '9000'
       MINIO_USE_SSL: 'false'
-      # Override SMTP host when backend runs in Docker (Mailhog service name)
-      SMTP_HOST: mailhog
-      SMTP_PORT: '1025'
+      # SMTP comes from backend/.env (Gmail, etc.). For Mailhog in this stack, set:
+      #   SMTP_HOST=mailhog  SMTP_PORT=1025  and omit SMTP_USER / SMTP_PASSWORD
       # ~30 min live consultations + sequential AI jobs (default Node heap is ~2GB)
       NODE_OPTIONS: --max-old-space-size=6144
     depends_on:

@@ -17,6 +17,7 @@ import { usersApi, userKeys } from '@/api/users.api';
 import { useAuthStore } from '@/stores/auth.store';
 import type { User, UserRole } from '@/types';
 import { ReassignPatientDoctorModal } from './ReassignPatientDoctorModal';
+import { ResendLoginDetailsButton } from './ResendLoginDetailsButton';
 import { formatDate, formatRelative } from '@/utils';
 import { cn } from '@/utils/cn';
 
@@ -302,6 +303,11 @@ export function UsersPage() {
                       </td>
                       <td className="px-4 py-3 text-right">
                         <div className="flex items-center justify-end gap-1">
+                          <ResendLoginDetailsButton
+                            userId={user.id}
+                            userLabel={user.email}
+                            targetRole={user.role}
+                          />
                           {user.role === 'patient' && user.patientProfileId && (
                             <button
                               type="button"
@@ -364,6 +370,11 @@ export function UsersPage() {
                   )}
                 </div>
                 <div className="flex gap-1">
+                  <ResendLoginDetailsButton
+                    userId={user.id}
+                    userLabel={user.email}
+                    targetRole={user.role}
+                  />
                   {user.role === 'patient' && user.patientProfileId && (
                     <button
                       type="button"

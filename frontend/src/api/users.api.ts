@@ -72,6 +72,11 @@ export const usersApi = {
   delete: async (id: string): Promise<void> => {
     await apiClient.delete(`/api/users/${id}`);
   },
+
+  resendLoginDetails: async (id: string): Promise<{ success: boolean }> => {
+    const res = await apiClient.post(`/api/users/${id}/resend-login`);
+    return unwrap(res);
+  },
 };
 
 export const userKeys = {

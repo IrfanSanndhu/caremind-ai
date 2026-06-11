@@ -76,6 +76,22 @@ usersRoutes.get(
   }),
 );
 
+usersRoutes.post(
+  '/:id/resend-login',
+  requireRole('admin', 'doctor'),
+  asyncHandler(async (req, res) => {
+    const result = await service.resendLoginDetails(
+      req.auth,
+      req.tenantPrisma,
+      req.params['id']!,
+    );
+    res.json({
+      data: result,
+      meta: { requestId: uuidv4(), timestamp: new Date().toISOString() },
+    });
+  }),
+);
+
 usersRoutes.delete(
   '/:id',
   requireRole('admin', 'doctor'),

@@ -10,6 +10,7 @@ import toast from 'react-hot-toast';
 const ACTION_FILTER_OPTIONS = [
   { value: '', label: 'All actions' },
   { value: 'INVITE_USER', label: 'Invite user' },
+  { value: 'RESEND_LOGIN', label: 'Resend login' },
   { value: 'DELETE_USER', label: 'Delete user' },
   { value: 'JOIN_CONSULTATION', label: 'Join consultation' },
   { value: 'START_RECORDING', label: 'Start recording' },

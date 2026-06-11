@@ -66,9 +66,18 @@ const envSchema = z
     LIVEKIT_API_KEY: z.string().min(1),
     LIVEKIT_API_SECRET: z.string().min(1),
 
-    // Email — smtp (Mailhog/dev) or resend (production MVP)
+    // Email — smtp (Mailhog/dev, Gmail, etc.) or resend (production MVP)
     EMAIL_PROVIDER: z.enum(['smtp', 'resend']).default('smtp'),
-    EMAIL_FROM: z.string().email().default('dev@caremind.local'),
+    EMAIL_FROM: z
+      .string()
+      .min(1)
+      .default('dev@caremind.local')
+      .refine((value) => {
+        const trimmed = value.trim();
+        const bracketMatch = trimmed.match(/<([^>]+)>/);
+        const email = (bracketMatch?.[1] ?? trimmed).trim();
+        return z.string().email().safeParse(email).success;
+      }, 'EMAIL_FROM must be a valid email or "Display Name <email@domain.com>"'),
     RESEND_API_KEY: z.string().optional(),
     SMTP_HOST: z.string().optional(),
     SMTP_PORT: z.coerce.number().optional(),
@@ -76,6 +85,8 @@ const envSchema = z
       .string()
       .default('false')
       .transform((v) => v === 'true'),
+    SMTP_USER: z.string().optional(),
+    SMTP_PASSWORD: z.string().optional(),
 
     // App
     APP_URL: z.string().url(),
@@ -133,6 +144,22 @@ const envSchema = z
           code: z.ZodIssueCode.custom,
           path: ['SMTP_PORT'],
           message: 'SMTP_PORT is required when EMAIL_PROVIDER=smtp (Mailhog default: 1025)',
+        });
+      }
+      const smtpUser = data.SMTP_USER?.trim();
+      const smtpPassword = data.SMTP_PASSWORD?.trim();
+      if (smtpUser && !smtpPassword) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['SMTP_PASSWORD'],
+          message: 'SMTP_PASSWORD is required when SMTP_USER is set',
+        });
+      }
+      if (smtpPassword && !smtpUser) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['SMTP_USER'],
+          message: 'SMTP_USER is required when SMTP_PASSWORD is set',
         });
       }
     }

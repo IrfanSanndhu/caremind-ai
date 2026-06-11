@@ -24,6 +24,8 @@ import { patientsApi, patientKeys, GENDER_OPTIONS, formatGender } from '@/api/pa
 import { usersApi, userKeys } from '@/api/users.api';
 import { PatientGender } from '@/types';
 import { formatDate } from '@/utils/formatDate';
+import { ResendLoginDetailsButton } from '@/features/users/ResendLoginDetailsButton';
+import { UserRole } from '@/types';
 
 const invitePatientSchema = z.object({
   firstName: z.string().min(1, 'Required'),
@@ -161,6 +163,16 @@ export function PatientsPage() {
                       </td>
                       <td className="px-4 py-3 text-slate-700">{p.sessionCount ?? 0}</td>
                       <td className="px-4 py-3 text-right">
+                        <div
+                          className="flex items-center justify-end gap-1"
+                          onClick={(e) => e.stopPropagation()}
+                          onKeyDown={(e) => e.stopPropagation()}
+                        >
+                          <ResendLoginDetailsButton
+                            userId={p.userId}
+                            userLabel={p.email}
+                            targetRole={UserRole.PATIENT}
+                          />
                         <button
                           type="button"
                           onClick={(e) => {
@@ -175,6 +187,7 @@ export function PatientsPage() {
                         >
                           <Trash2 className="w-4 h-4" />
                         </button>
+                        </div>
                       </td>
                     </tr>
                   ))
@@ -213,20 +226,31 @@ export function PatientsPage() {
                     {formatGender(p.gender)} · {p.sessionCount ?? 0} sessions
                   </p>
                 </div>
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setDeleteTarget({
-                      userId: p.userId,
-                      name: `${p.firstName} ${p.lastName}`.trim(),
-                    });
-                  }}
-                  className="p-2 text-muted hover:text-danger"
-                  aria-label="Remove patient"
+                <div
+                  className="flex gap-1"
+                  onClick={(e) => e.stopPropagation()}
+                  onKeyDown={(e) => e.stopPropagation()}
                 >
-                  <Trash2 className="w-4 h-4" />
-                </button>
+                  <ResendLoginDetailsButton
+                    userId={p.userId}
+                    userLabel={p.email}
+                    targetRole={UserRole.PATIENT}
+                  />
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setDeleteTarget({
+                        userId: p.userId,
+                        name: `${p.firstName} ${p.lastName}`.trim(),
+                      });
+                    }}
+                    className="p-2 text-muted hover:text-danger"
+                    aria-label="Remove patient"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                </div>
               </div>
             </Card>
           ))
