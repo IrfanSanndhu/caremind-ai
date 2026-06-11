@@ -172,3 +172,53 @@
   0%, 100% { background-position: 0% 50%; }
   50% { background-position: 100% 50%; }
 }
+
+/* TipTap rich text editor (AI output cards) */
+.rich-text-editor .tiptap {
+  @apply text-sm text-slate-800 leading-relaxed break-words;
+}
+
+.rich-text-editor .tiptap:focus {
+  outline: none;
+}
+
+.rich-text-editor .tiptap p {
+  @apply mb-2 last:mb-0;
+}
+
+.rich-text-editor .tiptap h2 {
+  @apply text-base font-semibold text-slate-900 mt-4 mb-2 first:mt-0;
+}
+
+.rich-text-editor .tiptap h3 {
+  @apply text-sm font-semibold text-slate-900 mt-3 mb-1.5 first:mt-0;
+}
+
+.rich-text-editor .tiptap ul {
+  @apply list-disc pl-5 mb-3 space-y-1;
+}
+
+.rich-text-editor .tiptap ol {
+  @apply list-decimal pl-5 mb-3 space-y-1;
+}
+
+.rich-text-editor .tiptap li {
+  @apply leading-relaxed;
+}
+
+.rich-text-editor .tiptap blockquote {
+  @apply border-l-4 border-primary-200 pl-3 my-2 text-slate-700 italic;
+}
+
+.rich-text-editor .tiptap strong {
+  @apply font-semibold text-slate-900;
+}
+
+.rich-text-editor .tiptap em {
+  @apply italic text-slate-700;
+}
+
+.rich-text-editor .tiptap p.is-editor-empty:first-child::before {
+  @apply text-muted float-left h-0 pointer-events-none;
+  content: attr(data-placeholder);
+}

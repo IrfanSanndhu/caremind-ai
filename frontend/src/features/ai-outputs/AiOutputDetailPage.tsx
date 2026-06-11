@@ -3,8 +3,9 @@ import { useParams } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Check, X, Edit3, History } from 'lucide-react';
 import toast from 'react-hot-toast';
-import { Button, Card, CardHeader, Textarea, Modal, Skeleton } from '@/components/ui';
+import { Button, Card, CardHeader, Modal, Skeleton } from '@/components/ui';
 import { MarkdownContent } from '@/components/shared/MarkdownContent';
+import { RichTextEditor } from '@/components/shared/RichTextEditor';
 import { AiOutputStatusBadge } from '@/components/shared/StatusBadge';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { aiOutputsApi, aiOutputKeys } from '@/api/aiOutputs.api';
@@ -93,10 +94,12 @@ function OutputCard({ output, onRefresh }: OutputCardProps) {
 
       {editing ? (
         <div className="space-y-3">
-          <Textarea
+          <RichTextEditor
+            key={`${output.id}-edit`}
             value={editContent}
-            onChange={(e) => setEditContent(e.target.value)}
-            className="min-h-[200px] font-mono text-sm"
+            onChange={setEditContent}
+            placeholder="Edit clinical note…"
+            minHeight="14rem"
           />
           <div className="flex flex-wrap gap-2">
             <Button
@@ -168,7 +171,10 @@ function OutputCard({ output, onRefresh }: OutputCardProps) {
                 size="sm"
                 variant="ghost"
                 leftIcon={<Edit3 className="w-3.5 h-3.5" />}
-                onClick={() => setEditing(true)}
+                onClick={() => {
+                  setEditContent(output.currentContent);
+                  setEditing(true);
+                }}
               >
                 Edit
               </Button>
@@ -180,7 +186,10 @@ function OutputCard({ output, onRefresh }: OutputCardProps) {
               size="sm"
               variant="ghost"
               leftIcon={<Edit3 className="w-3.5 h-3.5" />}
-              onClick={() => setEditing(true)}
+              onClick={() => {
+                setEditContent(output.currentContent);
+                setEditing(true);
+              }}
               className="mt-3"
             >
               Edit
