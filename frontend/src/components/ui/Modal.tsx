@@ -15,6 +15,8 @@ interface ModalProps {
   /** When false, backdrop click and Escape do not close the modal. */
   dismissible?: boolean;
   className?: string;
+  /** Applied to the full-screen overlay (e.g. raise z-index above call UI). */
+  overlayClassName?: string;
 }
 
 const sizeClasses = {
@@ -35,6 +37,7 @@ export function Modal({
   showCloseButton = true,
   dismissible = true,
   className,
+  overlayClassName,
 }: ModalProps) {
   const overlayRef = useRef<HTMLDivElement>(null);
 
@@ -71,7 +74,10 @@ export function Modal({
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
           transition={{ duration: 0.15 }}
-          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm"
+          className={cn(
+            'fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm',
+            overlayClassName
+          )}
           onClick={handleOverlayClick}
           aria-modal="true"
           role="dialog"

@@ -1,9 +1,8 @@
-import { useNavigate } from 'react-router-dom';
 import { Track, RoomEvent } from 'livekit-client';
 import {
-  isTrackReference,
   RoomAudioRenderer,
   useDisconnectButton,
+  useLocalParticipant,
   useParticipants,
   useTracks,
 } from '@livekit/components-react';
@@ -14,9 +13,12 @@ import { buildParticipantLabels, getCallTitle } from './consultation-participant
 import { ConsultationVideoTile } from './ConsultationVideoTile';
 import { ConsultationFloatingWindow } from './ConsultationFloatingWindow';
 import { ConsultationMediaControl } from './ConsultationMediaControl';
+import {
+  findLocalCameraTrack,
+  findRemoteCameraTrack,
+} from './consultation-camera-tracks';
 
 export function ConsultationMinimizedCall() {
-  const navigate = useNavigate();
   const appointment = useConsultationSessionStore((s) => s.appointment);
   const appointmentId = useConsultationSessionStore((s) => s.appointmentId);
   const setMinimized = useConsultationSessionStore((s) => s.setMinimized);
@@ -24,6 +26,7 @@ export function ConsultationMinimizedCall() {
   const { buttonProps: leaveProps } = useDisconnectButton({});
 
   const participants = useParticipants();
+  const { localParticipant } = useLocalParticipant();
   const tracks = useTracks(
     [{ source: Track.Source.Camera, withPlaceholder: true }],
     { updateOnlyOn: [RoomEvent.ActiveSpeakersChanged], onlySubscribed: false }
@@ -33,14 +36,12 @@ export function ConsultationMinimizedCall() {
 
   const labels = buildParticipantLabels(appointment);
   const callTitle = getCallTitle(appointment);
-  const cameraTracks = tracks.filter(isTrackReference).filter((t) => t.source === Track.Source.Camera);
-  const localTrack = cameraTracks.find((t) => t.participant.isLocal);
-  const remoteTrack = cameraTracks.find((t) => !t.participant.isLocal);
+  const localTrack = findLocalCameraTrack(tracks, localParticipant);
+  const remoteTrack = findRemoteCameraTrack(tracks);
   const remoteCount = participants.filter((p) => !p.isLocal).length;
 
   const handleExpand = () => {
     setMinimized(false);
-    navigate(`/appointments/${appointmentId}/consultation`);
   };
 
   return (

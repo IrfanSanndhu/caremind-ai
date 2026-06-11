@@ -4,7 +4,10 @@ import { ChevronRight, FileText, Brain } from 'lucide-react';
 import { consultationsApi, consultationKeys } from '@/api/consultations.api';
 import { useConsultationSessionStore } from '@/stores/consultation-session.store';
 import { cn } from '@/utils/cn';
-import { ConsultationTranscriptPanel } from './ConsultationTranscriptPanel';
+import {
+  ConsultationTranscriptPanel,
+  CONSULTATION_TRANSCRIPT_CALL_NOTE,
+} from './ConsultationTranscriptPanel';
 
 export function ConsultationSidePanel({
   appointmentId,
@@ -71,6 +74,7 @@ export function ConsultationSidePanel({
               segments={displaySegments}
               isLive={isLive}
               variant="dark"
+              showRecordingHint
             />
           ) : (
             <div className="text-center py-8">
@@ -79,6 +83,9 @@ export function ConsultationSidePanel({
                 {isRecording
                   ? 'Listening… speech will appear here with doctor and patient names.'
                   : 'Start recording to see a live transcript, or open this panel after the visit is processed.'}
+              </p>
+              <p className="text-slate-500 text-[11px] leading-snug mt-4">
+                {CONSULTATION_TRANSCRIPT_CALL_NOTE}
               </p>
             </div>
           )

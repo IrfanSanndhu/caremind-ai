@@ -79,6 +79,7 @@ export function ConsultationFloatingWindow({
 
   const onPointerDown = (e: React.PointerEvent) => {
     if (position === null) return;
+    if ((e.target as HTMLElement).closest('button')) return;
     e.preventDefault();
     (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
     dragState.current = {
@@ -143,6 +144,7 @@ export function ConsultationFloatingWindow({
         <p className="flex-1 min-w-0 text-xs font-medium text-white truncate">{title}</p>
         <button
           type="button"
+          onPointerDown={(e) => e.stopPropagation()}
           onClick={(e) => {
             e.stopPropagation();
             onExpand();

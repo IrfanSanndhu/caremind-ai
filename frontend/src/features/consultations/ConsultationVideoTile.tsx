@@ -1,4 +1,4 @@
-import type { TrackReference } from '@livekit/components-core';
+import type { TrackReference, TrackReferenceOrPlaceholder } from '@livekit/components-core';
 import { ParticipantContext, TrackRefContext, VideoTrack } from '@livekit/components-react';
 import { MicOff } from 'lucide-react';
 import { Avatar } from '@/components/ui/Avatar';
@@ -11,7 +11,7 @@ export function ConsultationVideoTile({
   labels,
   variant,
 }: {
-  trackRef: TrackReference;
+  trackRef: TrackReferenceOrPlaceholder;
   labels: ParticipantLabelMap;
   variant: 'main' | 'pip';
 }) {
@@ -22,7 +22,9 @@ export function ConsultationVideoTile({
     labels
   );
   const isLocal = participant.isLocal;
-  const pub = trackRef.publication;
+  const trackReference =
+    'publication' in trackRef && trackRef.publication ? (trackRef as TrackReference) : null;
+  const pub = trackReference?.publication;
   const hasVideo = Boolean(pub?.track && !pub.isMuted);
   return (
     <TrackRefContext.Provider value={trackRef}>
@@ -34,9 +36,9 @@ export function ConsultationVideoTile({
             variant === 'main' ? 'consultation-tile-main rounded-none' : 'consultation-tile-pip rounded-2xl'
           )}
         >
-          {hasVideo ? (
+          {hasVideo && trackReference ? (
             <VideoTrack
-              trackRef={trackRef}
+              trackRef={trackReference}
               className="consultation-video-element max-w-full max-h-full w-full h-full object-contain"
             />
           ) : (

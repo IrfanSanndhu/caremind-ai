@@ -91,7 +91,9 @@ export function AppointmentDetailPage() {
 
   const canJoin =
     (appointment.status === 'scheduled' || appointment.status === 'in_progress') &&
-    (role === UserRole.DOCTOR || (role === UserRole.PATIENT && appointment.consentStatus === 'accepted'));
+    (role === UserRole.DOCTOR ||
+      role === UserRole.ADMIN ||
+      (role === UserRole.PATIENT && appointment.consentStatus === 'accepted'));
 
   const tabs: { key: Tab; label: string; icon: React.ReactNode }[] = [
     { key: 'overview', label: 'Overview', icon: <Calendar className="w-4 h-4" /> },
@@ -119,7 +121,7 @@ export function AppointmentDetailPage() {
               leftIcon={<Video className="w-4 h-4" />}
               onClick={() => navigate(`/appointments/${id}/consultation`)}
             >
-              Join Consultation
+              Join Meeting
             </Button>
           )}
 
@@ -249,6 +251,15 @@ export function AppointmentDetailPage() {
             <CardHeader title="Schedule" action={<Clock className="w-4 h-4 text-muted" />} />
             <p className="font-semibold text-slate-900">{formatDateTime(appointment.scheduledAt)}</p>
             <p className="text-sm text-muted mt-1">Status: <AppointmentStatusBadge status={appointment.status} /></p>
+            {canJoin && (
+              <Button
+                className="mt-4 w-full sm:w-auto"
+                leftIcon={<Video className="w-4 h-4" />}
+                onClick={() => navigate(`/appointments/${id}/consultation`)}
+              >
+                Join Meeting
+              </Button>
+            )}
           </Card>
           <Card>
             <CardHeader title="Consent" action={<FileText className="w-4 h-4 text-muted" />} />

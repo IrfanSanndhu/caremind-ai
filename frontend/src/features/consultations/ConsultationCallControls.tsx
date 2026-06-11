@@ -98,6 +98,7 @@ export function ConsultationCallControls() {
         title="Call settings"
         description="Choose your microphone, camera, and speaker for this consultation."
         size="md"
+        overlayClassName="z-[310]"
       >
         <div className="space-y-6">
           <DeviceList kind="audioinput" title="Microphone" />

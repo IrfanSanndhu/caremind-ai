@@ -1,16 +1,26 @@
 import type { TranscriptSegmentView } from '@/types';
 import { cn } from '@/utils/cn';
 
+const SPEAKER_LABEL_NOTE =
+  'Speaker labels use your microphone as the doctor and the other call participant as the patient (from the video session, not voice order).';
+
+const RECORDING_HINT =
+  'You will not see any transcript until recording has started by doctor.';
+
+export const CONSULTATION_TRANSCRIPT_CALL_NOTE = `${SPEAKER_LABEL_NOTE} ${RECORDING_HINT}`;
+
 export function ConsultationTranscriptPanel({
   content,
   segments,
   isLive,
   variant = 'light',
+  showRecordingHint = false,
 }: {
   content: string;
   segments?: TranscriptSegmentView[];
   isLive?: boolean;
   variant?: 'light' | 'dark';
+  showRecordingHint?: boolean;
 }) {
   const isDark = variant === 'dark';
   const hasSegments = segments && segments.length > 0;
@@ -74,8 +84,8 @@ export function ConsultationTranscriptPanel({
           isDark ? 'text-slate-500' : 'text-muted'
         )}
       >
-        Speaker labels use your microphone as the doctor and the other call participant as the
-        patient (from the video session, not voice order).
+        {SPEAKER_LABEL_NOTE}
+        {showRecordingHint && ` ${RECORDING_HINT}`}
       </p>
     </div>
   );

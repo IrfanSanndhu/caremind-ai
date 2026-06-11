@@ -9,6 +9,7 @@ import { ConsultationVideoRoom } from './ConsultationVideoRoom';
 import { ConsultationMinimizedCall } from './ConsultationMinimizedCall';
 import { consultationsApi } from '@/api/consultations.api';
 import { ConsultationSidePanel } from './ConsultationSidePanel';
+import { ConsultationMediaPermissions } from './ConsultationMediaPermissions';
 
 export function ConsultationSessionHost() {
   const navigate = useNavigate();
@@ -45,11 +46,12 @@ export function ConsultationSessionHost() {
       token={token}
       serverUrl={livekitUrl}
       connect
-      video
-      audio
+      video={false}
+      audio={false}
       onDisconnected={handleDisconnected}
       className={isMinimized ? undefined : 'h-full w-full flex flex-col'}
     >
+      <ConsultationMediaPermissions />
       {isMinimized ? (
         <ConsultationMinimizedCall />
       ) : (
