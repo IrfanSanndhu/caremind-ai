@@ -121,7 +121,7 @@ export function AppointmentDetailPage() {
               leftIcon={<Video className="w-4 h-4" />}
               onClick={() => navigate(`/appointments/${id}/consultation`)}
             >
-              Join Meeting
+              Join Consultation
             </Button>
           )}
 
@@ -257,7 +257,7 @@ export function AppointmentDetailPage() {
                 leftIcon={<Video className="w-4 h-4" />}
                 onClick={() => navigate(`/appointments/${id}/consultation`)}
               >
-                Join Meeting
+                Join Consultation
               </Button>
             )}
           </Card>
