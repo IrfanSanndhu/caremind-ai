@@ -29,6 +29,10 @@ import type {
   MfaVerifyInput,
 } from './auth.schema.js';
 import { resolveUserProfile } from './auth-profile.js';
+import {
+  backfillUserTimeZoneFromBooking,
+  updateMyTimeZone,
+} from '../users/user-timezone.service.js';
 import type { AuthContext } from '../../types/auth.js';
 import type { PrismaClient as TenantPrisma } from '../../../node_modules/.prisma/tenant-client/index.js';
 import type { TrustedDevice } from '../../lib/prisma/central-prisma.types.js';
@@ -280,7 +284,19 @@ export async function revokeTrustedDevice(userId: string, deviceId: string) {
 
 export async function getMe(auth: AuthContext, tenantPrisma: TenantPrisma) {
   const central = getCentralPrisma();
+  const user = await repo.findUserById(central, auth.userId);
+  if (user?.role === 'doctor') {
+    await backfillUserTimeZoneFromBooking(tenantPrisma, auth.userId, user.role);
+  }
   return resolveUserProfile(central, tenantPrisma, auth.userId);
+}
+
+export async function updateTimeZone(
+  auth: AuthContext,
+  tenantPrisma: TenantPrisma,
+  timeZone: string,
+) {
+  return updateMyTimeZone(auth, tenantPrisma, timeZone);
 }
 
 export async function changePassword(userId: string, input: ChangePasswordInput) {

@@ -12,23 +12,50 @@ declare global {
   }
 }
 
+function verifyAccessToken(token: string): AuthContext {
+  const payload = jwt.verify(token, env.JWT_SECRET) as JwtPayload;
+  return {
+    userId: payload.sub,
+    orgId: payload.orgId,
+    role: payload.role,
+  };
+}
+
 export function authenticate(req: Request, _res: Response, next: NextFunction): void {
   const header = req.headers.authorization;
-  if (!header?.startsWith('Bearer ')) {
+  const isNotificationStream =
+    req.path.endsWith('/stream') || req.originalUrl.includes('/notifications/stream');
+  const queryToken =
+    isNotificationStream && typeof req.query.token === 'string' ? req.query.token : undefined;
+  const token = header?.startsWith('Bearer ') ? header.slice(7) : queryToken;
+
+  if (!token) {
     return next(new AuthError('Missing or malformed Authorization header'));
   }
 
-  const token = header.slice(7);
+  try {
+    req.auth = verifyAccessToken(token);
+    next();
+  } catch (err) {
+    if (err instanceof jwt.TokenExpiredError) {
+      return next(new AuthError('Access token expired'));
+    }
+    next(new AuthError('Invalid access token'));
+  }
+}
+
+/** Supports Bearer header or ?token= for EventSource SSE connections. */
+export function authenticateSse(req: Request, _res: Response, next: NextFunction): void {
+  const header = req.headers.authorization;
+  const queryToken = typeof req.query.token === 'string' ? req.query.token : undefined;
+  const token = header?.startsWith('Bearer ') ? header.slice(7) : queryToken;
+
+  if (!token) {
+    return next(new AuthError('Missing access token'));
+  }
 
   try {
-    const payload = jwt.verify(token, env.JWT_SECRET) as JwtPayload;
-
-    req.auth = {
-      userId: payload.sub,
-      orgId: payload.orgId,
-      role: payload.role,
-    };
-
+    req.auth = verifyAccessToken(token);
     next();
   } catch (err) {
     if (err instanceof jwt.TokenExpiredError) {

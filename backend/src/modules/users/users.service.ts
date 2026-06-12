@@ -10,6 +10,8 @@ import { logger } from '../../config/logger.js';
 import { ConflictError, ForbiddenError, NotFoundError } from '../../core/errors.js';
 import type { AuthContext } from '../../types/auth.js';
 import type { InviteDoctorInput, InvitePatientInput } from './users.schema.js';
+import { getUserTimeZone, syncDoctorBookingTimeZone } from './user-timezone.service.js';
+import * as bookingRepo from '../booking/booking.repository.js';
 
 const BCRYPT_ROUNDS = 12;
 
@@ -65,9 +67,17 @@ export async function inviteDoctor(
   const passwordHash = await bcrypt.hash(tempPassword, BCRYPT_ROUNDS);
   const userId = uuidv4();
   const doctorId = uuidv4();
+  const inviterTimeZone = await getUserTimeZone(auth.userId);
 
   await central.user.create({
-    data: { id: userId, email: input.email, passwordHash, role: 'doctor', orgId: auth.orgId },
+    data: {
+      id: userId,
+      email: input.email,
+      passwordHash,
+      role: 'doctor',
+      orgId: auth.orgId,
+      timezone: inviterTimeZone,
+    },
   });
 
   await repo.createDoctorProfile(tenantPrisma, {
@@ -79,6 +89,9 @@ export async function inviteDoctor(
     specialty: input.specialty,
     licenseNumber: input.licenseNumber,
   });
+
+  await bookingRepo.ensureDoctorBookingDefaults(tenantPrisma, doctorId, auth.orgId);
+  await syncDoctorBookingTimeZone(tenantPrisma, doctorId, auth.orgId, inviterTimeZone);
 
   await sendLoginDetailsEmail({
     to: input.email,

@@ -1,10 +1,16 @@
-type AppointmentStatus = 'scheduled' | 'in_progress' | 'completed' | 'cancelled';
+type AppointmentStatus =
+  | 'pending_approval'
+  | 'scheduled'
+  | 'in_progress'
+  | 'completed'
+  | 'cancelled';
 
 const STATUS_RANK: Record<AppointmentStatus, number> = {
-  in_progress: 0,
-  scheduled: 1,
-  completed: 2,
-  cancelled: 3,
+  pending_approval: 0,
+  in_progress: 1,
+  scheduled: 2,
+  completed: 3,
+  cancelled: 4,
 };
 
 type SortableAppointment = {
@@ -20,7 +26,8 @@ function scheduledAtMs(appt: SortableAppointment): number {
 
 /** Upcoming first (asc); completed/cancelled most recent first (desc). */
 function compareScheduledAt(a: SortableAppointment, b: SortableAppointment): number {
-  const desc = a.status === 'completed' || a.status === 'cancelled';
+  const desc =
+    a.status === 'completed' || a.status === 'cancelled';
   const diff = scheduledAtMs(a) - scheduledAtMs(b);
   return desc ? -diff : diff;
 }

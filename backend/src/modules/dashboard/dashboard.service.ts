@@ -33,29 +33,35 @@ export async function getDoctorDashboard(auth: AuthContext, tenantPrisma: Prisma
   const baseWhere = { orgId: auth.orgId, doctorId: doctor.id };
   const activeStatuses = ['scheduled', 'in_progress'] as const;
 
-  const [todayAppointments, pendingAiReviews, totalScheduled, activeRows] = await Promise.all([
-    tenantPrisma.appointment.count({
-      where: {
-        ...baseWhere,
-        scheduledAt: { gte: dayStart, lte: dayEnd },
-        status: { not: 'cancelled' },
-      },
-    }),
-    tenantPrisma.aiOutput.count({
-      where: {
-        orgId: auth.orgId,
-        status: 'pending_review',
-        appointment: { doctorId: doctor.id },
-      },
-    }),
-    tenantPrisma.appointment.count({
-      where: { ...baseWhere, status: { in: [...activeStatuses] } },
-    }),
-    tenantPrisma.appointment.findMany({
-      where: { ...baseWhere, status: { in: [...activeStatuses] } },
-      include: { patient: true, doctor: true },
-    }),
-  ]);
+  const [todayAppointments, pendingAiReviews, totalScheduled, activeRows, pendingRows] =
+    await Promise.all([
+      tenantPrisma.appointment.count({
+        where: {
+          ...baseWhere,
+          scheduledAt: { gte: dayStart, lte: dayEnd },
+          status: { not: 'cancelled' },
+        },
+      }),
+      tenantPrisma.aiOutput.count({
+        where: {
+          orgId: auth.orgId,
+          status: 'pending_review',
+          appointment: { doctorId: doctor.id },
+        },
+      }),
+      tenantPrisma.appointment.count({
+        where: { ...baseWhere, status: { in: [...activeStatuses] } },
+      }),
+      tenantPrisma.appointment.findMany({
+        where: { ...baseWhere, status: { in: [...activeStatuses] } },
+        include: { patient: true, doctor: true },
+      }),
+      tenantPrisma.appointment.findMany({
+        where: { ...baseWhere, status: 'pending_approval' },
+        include: { patient: true, doctor: true },
+        orderBy: { scheduledAt: 'asc' },
+      }),
+    ]);
 
   const sorted = sortAppointments(activeRows);
   const inProgressAppointments = sorted.filter((a) => a.status === 'in_progress');
@@ -65,9 +71,11 @@ export async function getDoctorDashboard(auth: AuthContext, tenantPrisma: Prisma
     stats: {
       todayAppointments,
       pendingAiReviews,
+      pendingBookingRequests: pendingRows.length,
       totalScheduled,
       inProgressCount: inProgressAppointments.length,
     },
+    pendingBookingRequests: pendingRows,
     inProgressAppointments,
     upcomingAppointments: [...inProgressAppointments, ...scheduledAppointments],
   };
@@ -90,7 +98,7 @@ export async function getPatientDashboard(auth: AuthContext, tenantPrisma: Prism
   const baseWhere = { orgId: auth.orgId, patientId: patient.id };
   const activeStatuses = ['scheduled', 'in_progress'] as const;
 
-  const [todayAppointments, totalScheduled, activeRows] = await Promise.all([
+  const [todayAppointments, totalScheduled, activeRows, pendingRows] = await Promise.all([
     tenantPrisma.appointment.count({
       where: {
         ...baseWhere,
@@ -105,6 +113,11 @@ export async function getPatientDashboard(auth: AuthContext, tenantPrisma: Prism
       where: { ...baseWhere, status: { in: [...activeStatuses] } },
       include: { patient: true, doctor: true },
     }),
+    tenantPrisma.appointment.findMany({
+      where: { ...baseWhere, status: 'pending_approval' },
+      include: { patient: true, doctor: true },
+      orderBy: { scheduledAt: 'asc' },
+    }),
   ]);
 
   const sorted = sortAppointments(activeRows);
@@ -116,7 +129,9 @@ export async function getPatientDashboard(auth: AuthContext, tenantPrisma: Prism
       todayAppointments,
       totalScheduled,
       inProgressCount: inProgressAppointments.length,
+      pendingBookingRequests: pendingRows.length,
     },
+    pendingBookingRequests: pendingRows,
     inProgressAppointments,
     upcomingAppointments: [...inProgressAppointments, ...scheduledAppointments],
   };

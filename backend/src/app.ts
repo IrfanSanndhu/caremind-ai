@@ -12,6 +12,7 @@ import { authRoutes } from './modules/auth/auth.routes.js';
 import { usersRoutes } from './modules/users/users.routes.js';
 import { patientsRoutes } from './modules/patients/patients.routes.js';
 import { appointmentRoutes } from './modules/appointments/appointments.routes.js';
+import { bookingRoutes } from './modules/booking/booking.routes.js';
 import { consultationRoutes } from './modules/consultations/consultations.routes.js';
 import { documentRoutes } from './modules/documents/documents.routes.js';
 import { aiAssistantRoutes } from './modules/ai-assistant/ai-assistant.routes.js';
@@ -19,6 +20,7 @@ import { aiOutputRoutes } from './modules/ai-outputs/ai-outputs.routes.js';
 import { pdfExportRoutes } from './modules/pdf-export/pdf-export.routes.js';
 import { adminRoutes } from './modules/admin/admin.routes.js';
 import { dashboardRoutes } from './modules/dashboard/dashboard.routes.js';
+import { notificationsRoutes } from './modules/notifications/notifications.routes.js';
 import { v4 as uuidv4 } from 'uuid';
 
 export function createApp(): express.Application {
@@ -50,7 +52,9 @@ export function createApp(): express.Application {
   app.use('/api/patients', ...tenantMiddleware, patientsRoutes);
   app.use('/api/dashboard', ...tenantMiddleware, dashboardRoutes);
   app.use('/api/appointments', ...tenantMiddleware, appointmentRoutes);
+  app.use('/api/booking', ...tenantMiddleware, bookingRoutes);
   app.use('/api/consultations', ...tenantMiddleware, consultationRoutes);
+  app.use('/api/notifications', ...tenantMiddleware, notificationsRoutes);
   app.use('/api/documents', ...tenantMiddleware, documentRoutes);
   app.use('/api/ai', ...tenantMiddleware, aiAssistantRoutes);
   app.use('/api/ai-outputs', ...tenantMiddleware, aiOutputRoutes);

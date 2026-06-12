@@ -1,10 +1,10 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { QRCodeSVG } from 'qrcode.react';
-import { Shield, ShieldCheck, Key, Monitor, Trash2 } from 'lucide-react';
+import { Shield, ShieldCheck, Key, Monitor, Trash2, Globe } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { Button, Card, CardHeader, Input, Badge, Skeleton } from '@/components/ui';
 import { PageHeader } from '@/components/layout/PageHeader';
@@ -17,6 +17,8 @@ import { hydrateAuthProfileAfterLogin } from '@/hooks/useAuthProfile';
 import { formatDateTime } from '@/utils/formatDate';
 import type { TrustedDevice } from '@/types';
 import { DEMO_EMAIL_DOMAIN, isDemoAccountEmail } from '@/constants/demo-accounts';
+import { TimezoneSelect } from '@/components/shared/TimezoneSelect';
+import { UserRole } from '@/types';
 
 const passwordSchema = z
   .object({
@@ -41,6 +43,12 @@ export function ProfilePage() {
   const displayName = getUserDisplayName(user);
   const mfaEligible =
     user?.mfaEligible !== false && !isDemoAccountEmail(user?.email ?? '');
+  const canEditTimezone = user?.role === UserRole.ADMIN || user?.role === UserRole.DOCTOR;
+  const [timezone, setTimezone] = useState(user?.timezone ?? 'UTC');
+
+  useEffect(() => {
+    setTimezone(user?.timezone ?? 'UTC');
+  }, [user?.timezone]);
 
   const {
     register,
@@ -81,6 +89,16 @@ export function ProfilePage() {
       void queryClient.invalidateQueries({ queryKey: ['auth', 'trusted-devices'] });
     },
     onError: (err: unknown) => toast.error(getApiErrorMessage(err, 'Failed to remove device')),
+  });
+
+  const timezoneMutation = useMutation({
+    mutationFn: authApi.updateTimezone,
+    onSuccess: async (data) => {
+      toast.success('Timezone updated');
+      setTimezone(data.timezone);
+      await hydrateAuthProfileAfterLogin();
+    },
+    onError: (err: unknown) => toast.error(getApiErrorMessage(err, 'Failed to update timezone')),
   });
 
   const changePasswordMutation = useMutation({
@@ -138,6 +156,30 @@ export function ProfilePage() {
           </div>
         </div>
       </Card>
+
+      {canEditTimezone && (
+        <Card className="mb-6">
+          <CardHeader
+            title="Timezone"
+            subtitle="Appointment times in emails and notifications use this timezone"
+            action={<Globe className="w-5 h-5 text-muted" />}
+          />
+          <TimezoneSelect
+            value={timezone}
+            onChange={setTimezone}
+            disabled={timezoneMutation.isPending}
+          />
+          <Button
+            className="mt-4"
+            variant="outline"
+            onClick={() => timezoneMutation.mutate(timezone)}
+            loading={timezoneMutation.isPending}
+            disabled={timezone === (user?.timezone ?? 'UTC')}
+          >
+            Save timezone
+          </Button>
+        </Card>
+      )}
 
       <Card className="mb-6">
         <CardHeader

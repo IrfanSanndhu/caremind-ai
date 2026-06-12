@@ -6,12 +6,23 @@ import { createApp } from './app.js';
 import { disconnectAll } from './core/tenant-prisma.js';
 import { getCentralPrisma } from './core/tenant-registry.js';
 import { attachLiveTranscriptWs } from './modules/consultations/live-transcript.ws.js';
+import {
+  initNotificationSubscriber,
+  disconnectNotificationSubscriber,
+} from './modules/notifications/notification-sse.hub.js';
+import { disconnectNotificationPublisher } from './modules/notifications/notification.publisher.js';
+import {
+  startNotificationCleanupScheduler,
+  stopNotificationCleanupScheduler,
+} from './modules/notifications/notification-cleanup.js';
 
 async function bootstrap(): Promise<void> {
   validateEnv();
   logger.info({ nodeEnv: env.NODE_ENV, port: env.PORT }, 'Starting CareMind AI backend');
 
   await startWorkers();
+  await initNotificationSubscriber();
+  startNotificationCleanupScheduler();
 
   const app = createApp();
   const server = createServer(app);
@@ -27,6 +38,9 @@ async function bootstrap(): Promise<void> {
     server.close(async () => {
       try {
         await stopWorkers();
+        stopNotificationCleanupScheduler();
+        await disconnectNotificationSubscriber();
+        await disconnectNotificationPublisher();
         await getCentralPrisma().$disconnect();
         await disconnectAll();
         logger.info('Graceful shutdown complete');

@@ -25,7 +25,19 @@ function mapTranscriptSegments(raw: unknown): TranscriptSegmentView[] | undefine
 
 const LIVEKIT_URL = import.meta.env.VITE_LIVEKIT_URL ?? 'wss://localhost:7880';
 
+export interface LiveParticipant {
+  identity: string;
+  name: string;
+  role?: string;
+}
+
+export type LivePresenceMap = Record<string, { participants: LiveParticipant[] }>;
+
 export const consultationsApi = {
+  getLivePresence: async (): Promise<LivePresenceMap> => {
+    const res = await apiClient.get('/api/consultations/live-presence');
+    return unwrap(res) as LivePresenceMap;
+  },
   /** POST /api/consultations/:appointmentId/join-token */
   getJoinToken: async (
     appointmentId: string
@@ -39,7 +51,12 @@ export const consultationsApi = {
       return { requiresConsent: true, token: '', roomName: '', livekitUrl: LIVEKIT_URL };
     }
 
-    const tokenData = data as { token: string; roomName: string; livekitUrl?: string };
+    const tokenData = data as {
+      token: string;
+      roomName: string;
+      livekitUrl?: string;
+      appointmentStatus?: string;
+    };
     const jwt =
       typeof tokenData.token === 'string'
         ? tokenData.token
@@ -51,6 +68,7 @@ export const consultationsApi = {
       token: jwt,
       roomName: tokenData.roomName,
       livekitUrl: tokenData.livekitUrl ?? LIVEKIT_URL,
+      appointmentStatus: tokenData.appointmentStatus,
     };
   },
 
@@ -105,6 +123,7 @@ export const consultationsApi = {
 
 export const consultationKeys = {
   all: ['consultations'] as const,
+  livePresence: () => [...consultationKeys.all, 'live-presence'] as const,
   joinToken: (appointmentId: string) => [...consultationKeys.all, 'join-token', appointmentId] as const,
   transcript: (appointmentId: string) => [...consultationKeys.all, 'transcript', appointmentId] as const,
 };

@@ -54,6 +54,7 @@ export async function resolveUserProfile(
     firstName,
     lastName,
     name: name ?? displayNameFromEmail(user.email),
+    timezone: user.timezone ?? 'UTC',
     mfaEnabled: user.mfaEnabled,
     mfaEligible: !isDemoAccountEmail(user.email),
     lastLogin: user.lastLoginAt?.toISOString() ?? null,

@@ -1,11 +1,15 @@
 import { useLocation, Link, useNavigate } from 'react-router-dom';
-import { Menu, Bell, ChevronRight, LogOut, User } from 'lucide-react';
+import { useQuery } from '@tanstack/react-query';
+import { Menu, ChevronRight, LogOut, User } from 'lucide-react';
 import { getUserDisplayName } from '@/utils/display-name';
 import { useUIStore } from '@/stores/ui.store';
 import { useAuthStore } from '@/stores/auth.store';
 import { useLogout } from '@/hooks/useLogout';
+import { useNotificationStream } from '@/hooks/useNotificationStream';
 import { Avatar } from '@/components/ui/Avatar';
 import { Dropdown } from '@/components/ui/Dropdown';
+import { NotificationPanel } from './NotificationPanel';
+import { notificationsApi, notificationKeys } from '@/api/notifications.api';
 
 function buildBreadcrumbs(pathname: string): { label: string; to: string }[] {
   const segments = pathname.split('/').filter(Boolean);
@@ -28,6 +32,14 @@ export function Topbar() {
   const location = useLocation();
   const navigate = useNavigate();
   const displayName = getUserDisplayName(user);
+
+  useNotificationStream();
+
+  const { data: unreadCount = 0 } = useQuery({
+    queryKey: notificationKeys.unreadCount(),
+    queryFn: notificationsApi.unreadCount,
+    refetchInterval: 60_000,
+  });
 
   const breadcrumbs = buildBreadcrumbs(location.pathname);
 
@@ -73,14 +85,7 @@ export function Topbar() {
       </nav>
 
       <div className="flex items-center gap-2">
-        <button
-          type="button"
-          className="p-2 rounded-md text-muted hover:text-slate-700 hover:bg-surface transition-colors relative min-h-[44px] min-w-[44px] flex items-center justify-center"
-          aria-label="Notifications"
-        >
-          <Bell className="w-5 h-5" />
-          <span className="absolute top-2 right-2 w-2 h-2 bg-danger rounded-full" aria-hidden="true" />
-        </button>
+        <NotificationPanel unreadCount={unreadCount} />
 
         <Dropdown
           trigger={

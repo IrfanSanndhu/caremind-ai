@@ -12,6 +12,7 @@ import {
   mfaVerifySchema,
   mfaSetupVerifySchema,
   changePasswordSchema,
+  updateTimezoneSchema,
   forgotPasswordSchema,
   resetPasswordSchema,
   trustedDeviceIdParamSchema,
@@ -77,6 +78,20 @@ authRoutes.get(
   resolveTenant,
   asyncHandler(async (req, res) => {
     const result = await service.getMe(req.auth, req.tenantPrisma);
+    res.json({
+      data: result,
+      meta: { requestId: uuidv4(), timestamp: new Date().toISOString() },
+    });
+  }),
+);
+
+authRoutes.patch(
+  '/me/timezone',
+  authenticate,
+  resolveTenant,
+  validate({ body: updateTimezoneSchema }),
+  asyncHandler(async (req, res) => {
+    const result = await service.updateTimeZone(req.auth, req.tenantPrisma, req.body.timezone);
     res.json({
       data: result,
       meta: { requestId: uuidv4(), timestamp: new Date().toISOString() },

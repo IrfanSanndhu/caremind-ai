@@ -1,11 +1,12 @@
 import { useEffect, useState, useCallback } from 'react';
 import { useParams } from 'react-router-dom';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { AlertTriangle } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { Button, Card, Spinner } from '@/components/ui';
 import { appointmentsApi, appointmentKeys } from '@/api/appointments.api';
-import { consultationsApi } from '@/api/consultations.api';
+import { consultationsApi, consultationKeys } from '@/api/consultations.api';
+import { dashboardKeys } from '@/api/dashboard.api';
 import { useAuthStore } from '@/stores/auth.store';
 import { useConsultationSessionStore } from '@/stores/consultation-session.store';
 import { UserRole } from '@/types';
@@ -57,6 +58,7 @@ function ConsentGate({
 
 export function ConsultationRoomPage() {
   const { id } = useParams<{ id: string }>();
+  const queryClient = useQueryClient();
   const { role } = useAuthStore();
   const startSession = useConsultationSessionStore((s) => s.startSession);
   const setMinimized = useConsultationSessionStore((s) => s.setMinimized);
@@ -85,19 +87,28 @@ export function ConsultationRoomPage() {
         setTokenError('Recording consent is required before joining.');
         return;
       }
+      const joinedAppointment =
+        res.appointmentStatus && res.appointmentStatus !== appointment.status
+          ? { ...appointment, status: res.appointmentStatus as typeof appointment.status }
+          : appointment;
+
       startSession({
         appointmentId: id,
         token: res.token,
         livekitUrl: res.livekitUrl,
-        appointment,
+        appointment: joinedAppointment,
         isMinimized: false,
       });
+
+      void queryClient.invalidateQueries({ queryKey: appointmentKeys.all });
+      void queryClient.invalidateQueries({ queryKey: dashboardKeys.all });
+      void queryClient.invalidateQueries({ queryKey: consultationKeys.livePresence() });
     } catch {
       setTokenError('Failed to join consultation. Please try again.');
     } finally {
       setTokenLoading(false);
     }
-  }, [id, appointment, startSession]);
+  }, [id, appointment, startSession, queryClient]);
 
   useEffect(() => {
     if (sessionStatus === 'active' && sessionAppointmentId === id) {

@@ -7,7 +7,9 @@ export const createAppointmentSchema = z.object({
 });
 
 export const updateAppointmentSchema = z.object({
-  status: z.enum(['scheduled', 'in_progress', 'completed', 'cancelled']).optional(),
+  status: z
+    .enum(['pending_approval', 'scheduled', 'in_progress', 'completed', 'cancelled'])
+    .optional(),
   scheduledAt: z.string().datetime().optional(),
 });
 
@@ -23,7 +25,9 @@ const optionalUuid = z
 export const listAppointmentsSchema = z.object({
   page: z.coerce.number().min(1).default(1),
   limit: z.coerce.number().min(1).max(100).default(20),
-  status: z.enum(['scheduled', 'in_progress', 'completed', 'cancelled']).optional(),
+  status: z
+    .enum(['pending_approval', 'scheduled', 'in_progress', 'completed', 'cancelled'])
+    .optional(),
   patientId: optionalUuid,
   doctorId: optionalUuid,
 });

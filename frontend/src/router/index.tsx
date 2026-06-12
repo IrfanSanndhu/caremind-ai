@@ -37,6 +37,7 @@ import { AuditLogsPage } from '@/features/admin/AuditLogsPage';
 
 // Profile
 import { ProfilePage } from '@/features/auth/ProfilePage';
+import { BookingPage } from '@/features/booking/BookingPage';
 
 // Landing
 import { LandingPage } from '@/landing-page/LandingPage';
@@ -78,6 +79,14 @@ export const router = createBrowserRouter([
             ),
           },
           { path: 'appointments', element: <AppointmentsPage /> },
+          {
+            path: 'booking',
+            element: (
+              <RoleGuard allowedRoles={[UserRole.DOCTOR, UserRole.PATIENT]}>
+                <BookingPage />
+              </RoleGuard>
+            ),
+          },
           { path: 'appointments/:id', element: <AppointmentDetailPage /> },
           {
             path: 'documents',

@@ -125,8 +125,15 @@ export function buildAppointmentTimeSeries(
   }));
 }
 
-const STATUS_ORDER = ['scheduled', 'in_progress', 'completed', 'cancelled'] as const;
+const STATUS_ORDER = [
+  'pending_approval',
+  'scheduled',
+  'in_progress',
+  'completed',
+  'cancelled',
+] as const;
 const STATUS_LABELS: Record<(typeof STATUS_ORDER)[number], string> = {
+  pending_approval: 'Pending Approval',
   scheduled: 'Scheduled',
   in_progress: 'In Progress',
   completed: 'Completed',

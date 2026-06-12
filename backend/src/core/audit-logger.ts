@@ -24,7 +24,10 @@ export type AuditAction =
   | 'VERIFY_MFA'
   | 'AI_CHAT'
   | 'EXPORT_PDF'
-  | 'VIEW_AUDIT_LOG';
+  | 'VIEW_AUDIT_LOG'
+  | 'BOOK_APPOINTMENT'
+  | 'APPROVE_APPOINTMENT'
+  | 'REJECT_APPOINTMENT';
 
 export async function auditLog(params: {
   tenantPrisma: PrismaClient;

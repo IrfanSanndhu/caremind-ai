@@ -35,6 +35,7 @@ model User {
   orgId         String
   mfaEnabled    Boolean      @default(false)
   mfaSecret     String?      // TOTP secret (encrypted)
+  timezone      String       @default("UTC") // IANA timezone, e.g. Asia/Karachi
   deletedAt     DateTime?
   createdAt     DateTime     @default(now())
   lastLoginAt   DateTime?

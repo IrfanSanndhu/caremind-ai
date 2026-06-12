@@ -8,6 +8,7 @@ export const UserRole = {
 export type UserRole = (typeof UserRole)[keyof typeof UserRole];
 
 export const AppointmentStatus = {
+  PENDING_APPROVAL: 'pending_approval',
   SCHEDULED: 'scheduled',
   IN_PROGRESS: 'in_progress',
   COMPLETED: 'completed',
@@ -58,6 +59,8 @@ export interface User {
   lastName?: string;
   name?: string;
   mfaEnabled?: boolean;
+  /** IANA timezone (admin & doctor). */
+  timezone?: string;
   /** False for @demo.clinic seed accounts — MFA cannot be enabled. */
   mfaEligible?: boolean;
   lastLogin?: string;
@@ -307,6 +310,7 @@ export interface LiveKitTokenResponse {
   token: string;
   roomName: string;
   livekitUrl: string;
+  appointmentStatus?: string;
 }
 
 export interface MfaSetupResponse {

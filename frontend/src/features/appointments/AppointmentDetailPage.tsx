@@ -8,6 +8,7 @@ import {
 import toast from 'react-hot-toast';
 import { Button, Card, CardHeader, Modal, ModalFooter, Skeleton } from '@/components/ui';
 import { AppointmentStatusBadge, ConsentStatusBadge } from '@/components/shared/StatusBadge';
+import { InCallBadge } from '@/components/shared/InCallBadge';
 import { AiOutputDetailPage } from '@/features/ai-outputs/AiOutputDetailPage';
 import { AppointmentDocumentsSection } from '@/features/documents/AppointmentDocumentsSection';
 import { appointmentsApi, appointmentKeys } from '@/api/appointments.api';
@@ -40,6 +41,15 @@ export function AppointmentDetailPage() {
     enabled: !!id && tab === 'transcript',
     retry: 1,
   });
+
+  const { data: livePresence } = useQuery({
+    queryKey: consultationKeys.livePresence(),
+    queryFn: consultationsApi.getLivePresence,
+    enabled: !!id,
+    refetchInterval: 10_000,
+  });
+
+  const inCallParticipants = id ? livePresence?.[id]?.participants : undefined;
 
   const consentMutation = useMutation({
     mutationFn: (status: 'accepted' | 'declined') => appointmentsApi.updateConsent(id!, status),
@@ -107,8 +117,9 @@ export function AppointmentDetailPage() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-start gap-4 justify-between">
         <div>
-          <div className="flex items-center gap-3 mb-2">
+          <div className="flex items-center gap-3 mb-2 flex-wrap">
             <h1 className="text-3xl font-bold text-slate-900">Appointment</h1>
+            <InCallBadge participants={inCallParticipants} compact />
             <AppointmentStatusBadge status={appointment.status} />
           </div>
           <p className="text-muted">
@@ -227,6 +238,16 @@ export function AppointmentDetailPage() {
       {/* Tab Content */}
       {tab === 'overview' && (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {inCallParticipants && inCallParticipants.length > 0 && (
+            <Card className="md:col-span-2 border-emerald-200 bg-emerald-50/40">
+              <CardHeader
+                title="Live in consultation"
+                subtitle="Participants currently in the video call"
+                action={<Video className="w-4 h-4 text-emerald-600" />}
+              />
+              <InCallBadge participants={inCallParticipants} />
+            </Card>
+          )}
           <Card>
             <CardHeader title="Patient" action={<User className="w-4 h-4 text-muted" />} />
             <p className="font-semibold text-slate-900">
@@ -250,7 +271,11 @@ export function AppointmentDetailPage() {
           <Card>
             <CardHeader title="Schedule" action={<Clock className="w-4 h-4 text-muted" />} />
             <p className="font-semibold text-slate-900">{formatDateTime(appointment.scheduledAt)}</p>
-            <p className="text-sm text-muted mt-1">Status: <AppointmentStatusBadge status={appointment.status} /></p>
+            <div className="flex items-center gap-2 mt-1 flex-wrap">
+              <span className="text-sm text-muted">Status:</span>
+              <InCallBadge participants={inCallParticipants} compact />
+              <AppointmentStatusBadge status={appointment.status} />
+            </div>
             {canJoin && (
               <Button
                 className="mt-4 w-full sm:w-auto"

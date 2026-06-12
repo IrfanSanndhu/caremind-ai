@@ -10,7 +10,10 @@ import {
   Video,
   FileText,
   BrainCircuit,
+  CalendarClock,
 } from 'lucide-react';
+import { consultationsApi, consultationKeys } from '@/api/consultations.api';
+import { InCallBadge } from '@/components/shared/InCallBadge';
 import { Button, Card, CardHeader, Skeleton } from '@/components/ui';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { AppointmentStatusBadge } from '@/components/shared/StatusBadge';
@@ -21,27 +24,59 @@ import { useAuthStore } from '@/stores/auth.store';
 import { UserRole } from '@/types';
 import type { Appointment } from '@/types';
 import { formatDateTime } from '@/utils/formatDate';
+import { PendingRequestsPanel } from '@/features/booking/PendingRequestsPanel';
+import { cn } from '@/utils/cn';
 
-function StatCard({ label, value, icon, trend, loading }: {
+function StatCard({
+  label,
+  value,
+  icon,
+  trend,
+  loading,
+  emphasizeWhenPositive,
+}: {
   label: string;
   value?: number;
   icon: React.ReactNode;
   trend?: string;
   loading?: boolean;
+  /** Amber highlight when value &gt; 0 — draws attention to action needed */
+  emphasizeWhenPositive?: boolean;
 }) {
+  const hasAttention = emphasizeWhenPositive && !loading && (value ?? 0) > 0;
+
   return (
-    <Card padding="md">
+    <Card
+      padding="md"
+      className={cn(
+        hasAttention && 'border-warning/50 bg-warning-50/60 ring-1 ring-warning/20',
+      )}
+    >
       <div className="flex items-center justify-between">
         <div>
           {loading ? (
             <Skeleton className="h-8 w-16 mb-1" />
           ) : (
-            <p className="text-3xl font-bold text-slate-900">{value ?? 0}</p>
+            <p
+              className={cn(
+                'text-3xl font-bold',
+                hasAttention ? 'text-warning-700' : 'text-slate-900',
+              )}
+            >
+              {value ?? 0}
+            </p>
           )}
-          <p className="text-sm text-muted mt-0.5">{label}</p>
+          <p className={cn('text-sm mt-0.5', hasAttention ? 'text-warning-800 font-medium' : 'text-muted')}>
+            {label}
+          </p>
           {trend && <p className="text-xs text-success-600 mt-1 flex items-center gap-1"><TrendingUp className="w-3 h-3" />{trend}</p>}
         </div>
-        <div className="w-11 h-11 rounded-xl bg-primary-50 flex items-center justify-center text-primary">
+        <div
+          className={cn(
+            'w-11 h-11 rounded-xl flex items-center justify-center',
+            hasAttention ? 'bg-warning-100 text-warning-700' : 'bg-primary-50 text-primary',
+          )}
+        >
           {icon}
         </div>
       </div>
@@ -54,11 +89,13 @@ function DashboardAppointmentRow({
   onOpen,
   onJoin,
   viewAs = 'doctor',
+  inCallParticipants,
 }: {
   appt: Appointment;
   onOpen: () => void;
   onJoin: () => void;
   viewAs?: 'doctor' | 'patient';
+  inCallParticipants?: { identity: string; name: string; role?: string }[];
 }) {
   const showJoin = appt.status === 'scheduled' || appt.status === 'in_progress';
   const title =
@@ -83,7 +120,10 @@ function DashboardAppointmentRow({
         <p className="text-sm font-medium text-slate-900 truncate">{title}</p>
         <p className="text-xs text-muted">{formatDateTime(appt.scheduledAt)}</p>
       </div>
-      <AppointmentStatusBadge status={appt.status} />
+      <div className="flex items-center gap-2 flex-shrink-0">
+        <InCallBadge participants={inCallParticipants} compact />
+        <AppointmentStatusBadge status={appt.status} />
+      </div>
       {showJoin && (
         <Button
           size="sm"
@@ -107,7 +147,14 @@ function DoctorDashboard() {
     retry: 1,
   });
 
+  const { data: livePresence } = useQuery({
+    queryKey: consultationKeys.livePresence(),
+    queryFn: consultationsApi.getLivePresence,
+    refetchInterval: 10_000,
+  });
+
   const stats = data?.stats;
+  const pendingBooking = data?.pendingBookingRequests ?? [];
   const inProgress = data?.inProgressAppointments ?? [];
   const upcoming = data?.upcomingAppointments ?? [];
   const scheduledUpcoming = upcoming.filter((a) => a.status === 'scheduled');
@@ -125,12 +172,19 @@ function DoctorDashboard() {
         }
       />
 
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-4">
         <StatCard
           label="Today's Appointments"
           value={stats?.todayAppointments}
           icon={<Calendar className="w-5 h-5" />}
           loading={isLoading}
+        />
+        <StatCard
+          label="Pending Requests"
+          value={stats?.pendingBookingRequests}
+          icon={<CalendarClock className="w-5 h-5" />}
+          loading={isLoading}
+          emphasizeWhenPositive
         />
         <StatCard
           label="In Progress"
@@ -154,6 +208,25 @@ function DoctorDashboard() {
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="lg:col-span-2 space-y-4">
+          {(isLoading || pendingBooking.length > 0) && (
+            <Card>
+              <CardHeader
+                title="Pending booking requests"
+                subtitle="Patient appointments waiting for your approval"
+                action={
+                  <Button size="sm" variant="ghost" onClick={() => navigate('/booking')}>
+                    Manage <ChevronRight className="w-3.5 h-3.5 ml-1" />
+                  </Button>
+                }
+              />
+              <PendingRequestsPanel
+                items={pendingBooking}
+                loading={isLoading}
+                compact
+              />
+            </Card>
+          )}
+
           {inProgress.length > 0 && (
             <Card>
               <CardHeader
@@ -170,6 +243,7 @@ function DoctorDashboard() {
                   <DashboardAppointmentRow
                     key={appt.id}
                     appt={appt}
+                    inCallParticipants={livePresence?.[appt.id]?.participants}
                     onOpen={() => navigate(`/appointments/${appt.id}`)}
                     onJoin={() => navigate(`/appointments/${appt.id}/consultation`)}
                   />
@@ -208,6 +282,7 @@ function DoctorDashboard() {
                   <DashboardAppointmentRow
                     key={appt.id}
                     appt={appt}
+                    inCallParticipants={livePresence?.[appt.id]?.participants}
                     onOpen={() => navigate(`/appointments/${appt.id}`)}
                     onJoin={() => navigate(`/appointments/${appt.id}/consultation`)}
                   />
@@ -274,7 +349,14 @@ function PatientDashboard() {
     retry: 1,
   });
 
+  const { data: livePresence } = useQuery({
+    queryKey: consultationKeys.livePresence(),
+    queryFn: consultationsApi.getLivePresence,
+    refetchInterval: 10_000,
+  });
+
   const stats = data?.stats;
+  const pendingBooking = data?.pendingBookingRequests ?? [];
   const inProgress = data?.inProgressAppointments ?? [];
   const upcoming = data?.upcomingAppointments ?? [];
   const scheduledUpcoming = upcoming.filter((a) => a.status === 'scheduled');
@@ -284,11 +366,17 @@ function PatientDashboard() {
     <div className="p-6 space-y-6">
       <PageHeader title="Dashboard" subtitle="Your health at a glance" />
 
-      <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <StatCard
           label="Today's Appointments"
           value={stats?.todayAppointments}
           icon={<Calendar className="w-5 h-5" />}
+          loading={isLoading}
+        />
+        <StatCard
+          label="Awaiting Approval"
+          value={stats?.pendingBookingRequests}
+          icon={<CalendarClock className="w-5 h-5" />}
           loading={isLoading}
         />
         <StatCard
@@ -307,6 +395,50 @@ function PatientDashboard() {
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="lg:col-span-2 space-y-4">
+          {(isLoading || pendingBooking.length > 0) && (
+            <Card>
+              <CardHeader
+                title="Awaiting doctor approval"
+                subtitle="Your booking requests not yet confirmed"
+                action={
+                  <Button size="sm" variant="ghost" onClick={() => navigate('/booking')}>
+                    Book more <ChevronRight className="w-3.5 h-3.5 ml-1" />
+                  </Button>
+                }
+              />
+              <div className="space-y-3">
+                {isLoading ? (
+                  Array.from({ length: 2 }).map((_, i) => (
+                    <Skeleton key={i} className="h-16 w-full" />
+                  ))
+                ) : (
+                  pendingBooking.map((appt) => (
+                    <div
+                      key={appt.id}
+                      className="flex items-center gap-3 p-3 rounded-lg border border-warning/30 bg-warning-50/40 cursor-pointer hover:bg-warning-50/60 transition-colors"
+                      onClick={() => navigate(`/appointments/${appt.id}`)}
+                      role="button"
+                      tabIndex={0}
+                      onKeyDown={(e) => { if (e.key === 'Enter') navigate(`/appointments/${appt.id}`); }}
+                    >
+                      <Avatar
+                        name={`Dr. ${appt.doctor?.firstName} ${appt.doctor?.lastName}`}
+                        size="sm"
+                      />
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium text-slate-900 truncate">
+                          Dr. {appt.doctor?.firstName} {appt.doctor?.lastName}
+                        </p>
+                        <p className="text-xs text-muted">{formatDateTime(appt.scheduledAt)}</p>
+                      </div>
+                      <AppointmentStatusBadge status={appt.status} />
+                    </div>
+                  ))
+                )}
+              </div>
+            </Card>
+          )}
+
           {inProgress.length > 0 && (
             <Card>
               <CardHeader
@@ -324,6 +456,7 @@ function PatientDashboard() {
                     key={appt.id}
                     appt={appt}
                     viewAs="patient"
+                    inCallParticipants={livePresence?.[appt.id]?.participants}
                     onOpen={() => navigate(`/appointments/${appt.id}`)}
                     onJoin={() => navigate(`/appointments/${appt.id}/consultation`)}
                   />
@@ -370,6 +503,7 @@ function PatientDashboard() {
                     key={appt.id}
                     appt={appt}
                     viewAs="patient"
+                    inCallParticipants={livePresence?.[appt.id]?.participants}
                     onOpen={() => navigate(`/appointments/${appt.id}`)}
                     onJoin={() => navigate(`/appointments/${appt.id}/consultation`)}
                   />

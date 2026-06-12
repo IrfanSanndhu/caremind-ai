@@ -1,7 +1,8 @@
 import { useMemo, useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
-import { Plus, Search, Calendar, Video } from 'lucide-react';
+import { Plus, Search, Calendar, Video, Radio } from 'lucide-react';
+import { InCallBadge } from '@/components/shared/InCallBadge';
 import toast from 'react-hot-toast';
 import {
   Button, Card, Input,
@@ -17,9 +18,12 @@ import { AppointmentStatus, UserRole } from '@/types';
 import { formatDateTime } from '@/utils/formatDate';
 import { cn } from '@/utils/cn';
 import { ScheduleAppointmentModal } from './ScheduleAppointmentModal';
+import { bookingApi } from '@/api/booking.api';
+import { consultationsApi, consultationKeys } from '@/api/consultations.api';
 
 const STATUS_TABS: { label: string; value: AppointmentStatus | 'all' }[] = [
   { label: 'All', value: 'all' },
+  { label: 'Pending', value: AppointmentStatus.PENDING_APPROVAL },
   { label: 'Scheduled', value: AppointmentStatus.SCHEDULED },
   { label: 'In Progress', value: AppointmentStatus.IN_PROGRESS },
   { label: 'Completed', value: AppointmentStatus.COMPLETED },
@@ -46,6 +50,12 @@ export function AppointmentsPage() {
     queryKey: appointmentKeys.list(params),
     queryFn: () => appointmentsApi.list(params),
     retry: 1,
+  });
+
+  const { data: livePresence } = useQuery({
+    queryKey: consultationKeys.livePresence(),
+    queryFn: consultationsApi.getLivePresence,
+    refetchInterval: 10_000,
   });
 
   const searchLower = search.trim().toLowerCase();
@@ -76,6 +86,24 @@ export function AppointmentsPage() {
       queryClient.invalidateQueries({ queryKey: appointmentKeys.all });
     },
     onError: () => toast.error('Failed to cancel appointment'),
+  });
+
+  const approveMutation = useMutation({
+    mutationFn: bookingApi.approveRequest,
+    onSuccess: () => {
+      toast.success('Appointment approved');
+      queryClient.invalidateQueries({ queryKey: appointmentKeys.all });
+    },
+    onError: (err: unknown) => toast.error(getApiErrorMessage(err, 'Failed to approve')),
+  });
+
+  const rejectMutation = useMutation({
+    mutationFn: bookingApi.rejectRequest,
+    onSuccess: () => {
+      toast.success('Request declined');
+      queryClient.invalidateQueries({ queryKey: appointmentKeys.all });
+    },
+    onError: (err: unknown) => toast.error(getApiErrorMessage(err, 'Failed to decline')),
   });
 
   return (
@@ -140,6 +168,7 @@ export function AppointmentsPage() {
                   <th className="text-left px-4 py-3 font-semibold text-slate-700">Doctor</th>
                   <th className="text-left px-4 py-3 font-semibold text-slate-700">Date & Time</th>
                   <th className="text-left px-4 py-3 font-semibold text-slate-700">Status</th>
+                  <th className="text-left px-4 py-3 font-semibold text-slate-700">In Call</th>
                   <th className="text-right px-4 py-3 font-semibold text-slate-700">Actions</th>
                 </tr>
               </thead>
@@ -147,7 +176,7 @@ export function AppointmentsPage() {
                 {isLoading ? (
                   Array.from({ length: 5 }).map((_, i) => (
                     <tr key={i}>
-                      {Array.from({ length: 5 }).map((_, j) => (
+                      {Array.from({ length: 6 }).map((_, j) => (
                         <td key={j} className="px-4 py-3">
                           <Skeleton className="h-4 w-full" />
                         </td>
@@ -156,7 +185,7 @@ export function AppointmentsPage() {
                   ))
                 ) : isError ? null : visibleItems.length === 0 ? (
                   <tr>
-                    <td colSpan={5} className="py-12">
+                    <td colSpan={6} className="py-12">
                       <EmptyState
                         icon={<Calendar className="w-6 h-6" />}
                         title="No appointments found"
@@ -188,6 +217,13 @@ export function AppointmentsPage() {
                       <td className="px-4 py-3">
                         <AppointmentStatusBadge status={appt.status} />
                       </td>
+                      <td className="px-4 py-3">
+                        {livePresence?.[appt.id]?.participants?.length ? (
+                          <InCallBadge participants={livePresence[appt.id].participants} />
+                        ) : (
+                          <span className="text-xs text-muted">—</span>
+                        )}
+                      </td>
                       <td className="px-4 py-3 text-right">
                         <div className="flex items-center justify-end gap-2">
                           {(appt.status === 'scheduled' || appt.status === 'in_progress') && (
@@ -202,6 +238,30 @@ export function AppointmentsPage() {
                             >
                               Join
                             </Button>
+                          )}
+
+                          {role === UserRole.DOCTOR && appt.status === 'pending_approval' && (
+                            <>
+                              <Button
+                                size="sm"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  approveMutation.mutate(appt.id);
+                                }}
+                              >
+                                Approve
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  rejectMutation.mutate(appt.id);
+                                }}
+                              >
+                                Decline
+                              </Button>
+                            </>
                           )}
 
                           {(role === UserRole.DOCTOR || role === UserRole.ADMIN) && appt.status === 'scheduled' && (
@@ -232,7 +292,8 @@ export function AppointmentsPage() {
 
                           {(role === UserRole.DOCTOR || role === UserRole.ADMIN) &&
                             appt.status !== 'cancelled' &&
-                            appt.status !== 'completed' && (
+                            appt.status !== 'completed' &&
+                            appt.status !== 'pending_approval' && (
                             <Button
                               size="sm"
                               variant="outline"
@@ -289,8 +350,14 @@ export function AppointmentsPage() {
                 </p>
                 <p className="text-sm text-muted">Dr. {appt.doctor?.firstName} {appt.doctor?.lastName}</p>
                 <p className="text-sm text-muted mt-1">{formatDateTime(appt.scheduledAt)}</p>
-                <div className="flex items-center gap-2 mt-2">
+                <div className="flex items-center gap-2 mt-2 flex-wrap">
                   <AppointmentStatusBadge status={appt.status} />
+                  {livePresence?.[appt.id]?.participants?.length ? (
+                    <span className="inline-flex items-center gap-1 text-xs font-medium text-emerald-700">
+                      <Radio className="w-3 h-3 animate-pulse" />
+                      {livePresence[appt.id].participants.map((p) => p.name).join(', ')} in call
+                    </span>
+                  ) : null}
                 </div>
 
                 <div className="flex flex-wrap gap-2 mt-3">
@@ -306,6 +373,30 @@ export function AppointmentsPage() {
                     >
                       Join
                     </Button>
+                  )}
+
+                  {role === UserRole.DOCTOR && appt.status === 'pending_approval' && (
+                    <>
+                      <Button
+                        size="sm"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          approveMutation.mutate(appt.id);
+                        }}
+                      >
+                        Approve
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          rejectMutation.mutate(appt.id);
+                        }}
+                      >
+                        Decline
+                      </Button>
+                    </>
                   )}
 
                   {(role === UserRole.DOCTOR || role === UserRole.ADMIN) && appt.status === 'scheduled' && (
@@ -336,7 +427,8 @@ export function AppointmentsPage() {
 
                   {(role === UserRole.DOCTOR || role === UserRole.ADMIN) &&
                     appt.status !== 'cancelled' &&
-                    appt.status !== 'completed' && (
+                    appt.status !== 'completed' &&
+                    appt.status !== 'pending_approval' && (
                     <Button
                       size="sm"
                       variant="outline"

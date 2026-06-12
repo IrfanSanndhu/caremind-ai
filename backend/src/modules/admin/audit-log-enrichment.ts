@@ -34,6 +34,9 @@ const ACTION_VERBS: Record<string, string> = {
   AI_CHAT: 'Used AI assistant',
   EXPORT_PDF: 'Exported PDF for',
   VIEW_AUDIT_LOG: 'Viewed audit logs',
+  BOOK_APPOINTMENT: 'Requested appointment',
+  APPROVE_APPOINTMENT: 'Approved appointment',
+  REJECT_APPOINTMENT: 'Declined appointment request for',
 };
 
 export function formatAuditSummary(

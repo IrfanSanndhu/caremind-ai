@@ -2,6 +2,7 @@ import { NavLink, useLocation } from 'react-router-dom';
 import {
   LayoutDashboard,
   Calendar,
+  CalendarPlus,
   BrainCircuit,
   FileText,
   User,
@@ -19,6 +20,7 @@ interface MobileNavItem {
 const mobileNavItems: MobileNavItem[] = [
   { to: '/dashboard', label: 'Home', icon: <LayoutDashboard className="w-5 h-5" />, roles: ['admin', 'doctor', 'patient'] },
   { to: '/appointments', label: 'Appts', icon: <Calendar className="w-5 h-5" />, roles: ['admin', 'doctor', 'patient'] },
+  { to: '/booking', label: 'Book', icon: <CalendarPlus className="w-5 h-5" />, roles: ['doctor', 'patient'] },
   { to: '/ai-assistant', label: 'AI Chat', icon: <BrainCircuit className="w-5 h-5" />, roles: ['doctor', 'patient'] },
   { to: '/documents', label: 'Docs', icon: <FileText className="w-5 h-5" />, roles: ['doctor', 'patient'] },
   { to: '/profile', label: 'Profile', icon: <User className="w-5 h-5" />, roles: ['admin', 'doctor', 'patient'] },

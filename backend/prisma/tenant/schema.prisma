@@ -52,15 +52,53 @@ model Doctor {
   deletedAt     DateTime?
   createdAt     DateTime @default(now())
 
-  appointments Appointment[]
-  primaryPatients Patient[]
+  appointments      Appointment[]
+  primaryPatients   Patient[]
+  bookingSettings   DoctorBookingSettings?
+  availabilityRules DoctorAvailabilityRule[]
 
   @@index([orgId])
   @@index([userId])
   @@map("doctors")
 }
 
+enum SlotDurationMinutes {
+  thirty
+  sixty
+}
+
+model DoctorBookingSettings {
+  doctorId            String              @id
+  orgId               String
+  slotDurationMinutes SlotDurationMinutes @default(thirty)
+  minLeadTimeHours    Int                 @default(2)
+  maxAdvanceDays      Int                 @default(30)
+  timezone            String              @default("UTC")
+  updatedAt           DateTime            @updatedAt
+
+  doctor Doctor @relation(fields: [doctorId], references: [id], onDelete: Cascade)
+
+  @@index([orgId])
+  @@map("doctor_booking_settings")
+}
+
+model DoctorAvailabilityRule {
+  id        String @id @default(uuid())
+  doctorId  String
+  orgId     String
+  dayOfWeek Int    // 0 = Sunday … 6 = Saturday
+  startTime String // "09:00" 24h
+  endTime   String // "21:00" 24h
+
+  doctor Doctor @relation(fields: [doctorId], references: [id], onDelete: Cascade)
+
+  @@unique([doctorId, dayOfWeek])
+  @@index([orgId])
+  @@map("doctor_availability_rules")
+}
+
 enum AppointmentStatus {
+  pending_approval
   scheduled
   in_progress
   completed
@@ -225,6 +263,7 @@ model VectorChunk {
 enum NotificationChannel {
   email
   sms
+  in_app
 }
 
 enum NotificationStatus {
@@ -234,16 +273,24 @@ enum NotificationStatus {
 }
 
 model Notification {
-  id        String             @id @default(uuid())
-  orgId     String
-  userId    String
-  channel   NotificationChannel
-  type      String
-  status    NotificationStatus @default(pending)
-  sentAt    DateTime?
-  createdAt DateTime           @default(now())
+  id           String             @id @default(uuid())
+  orgId        String
+  userId       String
+  channel      NotificationChannel
+  type         String
+  title        String
+  body         String             @db.Text
+  status       NotificationStatus @default(pending)
+  readAt       DateTime?
+  resourceType String?
+  resourceId   String?
+  metadata     Json               @default("{}")
+  sentAt       DateTime?
+  createdAt    DateTime           @default(now())
 
   @@index([orgId, userId])
+  @@index([orgId, userId, readAt])
+  @@index([orgId, userId, createdAt])
   @@map("notifications")
 }
 

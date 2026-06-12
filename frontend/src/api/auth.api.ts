@@ -21,6 +21,7 @@ export interface AuthMeResponse {
   name?: string;
   mfaEnabled: boolean;
   mfaEligible?: boolean;
+  timezone?: string;
   lastLogin?: string | null;
   createdAt?: string;
 }
@@ -36,6 +37,7 @@ function mapMeToUser(data: AuthMeResponse): User {
     name: data.name,
     mfaEnabled: data.mfaEnabled,
     mfaEligible: data.mfaEligible ?? true,
+    timezone: data.timezone ?? 'UTC',
     lastLogin: data.lastLogin ?? undefined,
     createdAt: data.createdAt,
   };
@@ -138,6 +140,11 @@ export const authApi = {
   getMe: async (): Promise<User> => {
     const res = await apiClient.get('/api/auth/me');
     return mapMeToUser(unwrap(res) as AuthMeResponse);
+  },
+
+  updateTimezone: async (timezone: string): Promise<{ timezone: string }> => {
+    const res = await apiClient.patch('/api/auth/me/timezone', { timezone });
+    return unwrap(res) as { timezone: string };
   },
 
   changePassword: async (payload: {

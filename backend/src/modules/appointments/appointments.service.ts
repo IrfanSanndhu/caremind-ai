@@ -2,8 +2,17 @@ import { v4 as uuidv4 } from 'uuid';
 import type { PrismaClient } from '../../../node_modules/.prisma/tenant-client/index.js';
 import * as repo from './appointments.repository.js';
 import { auditLog } from '../../core/audit-logger.js';
-import { getEmailAdapter } from '../../adapters/email/index.js';
+import { getCentralPrisma } from '../../core/tenant-registry.js';
 import { ForbiddenError, NotFoundError } from '../../core/errors.js';
+import { notifyUserWithTemplate } from '../notifications/notifications.service.js';
+import { formatAppointmentScheduledAt } from '../notifications/appointment-datetime.js';
+import {
+  appointmentNamePayload,
+  appointmentScheduledMessage,
+  appointmentCancelledMessage,
+  formatDoctorName,
+  formatPatientName,
+} from '../notifications/appointment-names.js';
 import type { AuthContext } from '../../types/auth.js';
 import type { CreateAppointmentInput, UpdateAppointmentInput, ConsentInput } from './appointments.schema.js';
 
@@ -25,24 +34,61 @@ export async function createAppointment(
     livekitRoomName,
   });
 
-  const patient = await tenantPrisma.patient.findUnique({
-    where: { id: input.patientId },
-    include: {},
-  });
+  const appointmentFull = await repo.findAppointmentById(tenantPrisma, appointmentId);
+  const scheduledAt = new Date(input.scheduledAt);
+  const dateStr = await formatAppointmentScheduledAt(
+    tenantPrisma,
+    input.doctorId,
+    orgId,
+    scheduledAt,
+  );
+  const central = getCentralPrisma();
+  const patientName = appointmentFull?.patient
+    ? formatPatientName(appointmentFull.patient)
+    : 'the patient';
+  const doctorName = appointmentFull?.doctor
+    ? formatDoctorName(appointmentFull.doctor)
+    : 'the doctor';
+  const namesPayload = appointmentNamePayload(patientName, doctorName, dateStr);
+  const scheduledBody = appointmentScheduledMessage(patientName, doctorName, dateStr);
 
-  if (patient) {
-    const centralUser = await import('../../core/tenant-registry.js').then(
-      (m) => m.getCentralPrisma().user.findUnique({ where: { id: patient.userId } }),
-    );
+  if (appointmentFull?.patient) {
+    const patientUser = await central.user.findUnique({
+      where: { id: appointmentFull.patient.userId },
+    });
+    if (patientUser) {
+      await notifyUserWithTemplate({
+        tenantPrisma,
+        orgId,
+        userId: appointmentFull.patient.userId,
+        userEmail: patientUser.email,
+        type: 'APPOINTMENT_SCHEDULED',
+        title: 'Appointment scheduled',
+        body: scheduledBody,
+        payload: namesPayload,
+        resourceType: 'Appointment',
+        resourceId: appointmentId,
+      });
+    }
+  }
 
-    if (centralUser) {
-      getEmailAdapter()
-        .send({
-          to: centralUser.email,
-          subject: 'Appointment Confirmed — CareMind AI',
-          html: `<p>Your appointment has been scheduled for ${new Date(input.scheduledAt).toLocaleString()}.</p>`,
-        })
-        .catch(() => { /* non-blocking */ });
+  if (appointmentFull?.doctor) {
+    const doctorUser = await central.user.findUnique({
+      where: { id: appointmentFull.doctor.userId },
+    });
+    if (doctorUser) {
+      await notifyUserWithTemplate({
+        tenantPrisma,
+        orgId,
+        userId: appointmentFull.doctor.userId,
+        userEmail: doctorUser.email,
+        type: 'APPOINTMENT_SCHEDULED',
+        title: 'New appointment scheduled',
+        body: scheduledBody,
+        payload: namesPayload,
+        resourceType: 'Appointment',
+        resourceId: appointmentId,
+      });
     }
   }
 
@@ -125,10 +171,66 @@ export async function updateAppointment(
   const appointment = await repo.findAppointmentById(tenantPrisma, appointmentId);
   if (!appointment || appointment.orgId !== auth.orgId) throw new NotFoundError('Appointment not found');
 
-  return repo.updateAppointment(tenantPrisma, appointmentId, {
+  const updated = await repo.updateAppointment(tenantPrisma, appointmentId, {
     ...(input.status && { status: input.status }),
     ...(input.scheduledAt && { scheduledAt: new Date(input.scheduledAt) }),
   });
+
+  if (input.status === 'cancelled') {
+    await notifyAppointmentCancelled(tenantPrisma, auth.orgId, appointment, auth.userId);
+  }
+
+  return updated;
+}
+
+async function notifyAppointmentCancelled(
+  tenantPrisma: PrismaClient,
+  orgId: string,
+  appointment: NonNullable<Awaited<ReturnType<typeof repo.findAppointmentById>>>,
+  actorUserId: string,
+) {
+  const dateStr = await formatAppointmentScheduledAt(
+    tenantPrisma,
+    appointment.doctorId,
+    orgId,
+    appointment.scheduledAt,
+  );
+  const central = getCentralPrisma();
+  const patientName = appointment.patient
+    ? formatPatientName(appointment.patient)
+    : 'the patient';
+  const doctorName = appointment.doctor
+    ? formatDoctorName(appointment.doctor)
+    : 'the doctor';
+  const namesPayload = appointmentNamePayload(patientName, doctorName, dateStr);
+  const cancelBody = appointmentCancelledMessage(patientName, doctorName, dateStr);
+  const targets: { userId: string }[] = [];
+
+  if (appointment.patient && appointment.patient.userId !== actorUserId) {
+    targets.push({ userId: appointment.patient.userId });
+  }
+  if (appointment.doctor && appointment.doctor.userId !== actorUserId) {
+    targets.push({ userId: appointment.doctor.userId });
+  }
+
+  await Promise.all(
+    targets.map(async (t) => {
+      const user = await central.user.findUnique({ where: { id: t.userId } });
+      if (!user) return;
+      await notifyUserWithTemplate({
+        tenantPrisma,
+        orgId,
+        userId: t.userId,
+        userEmail: user.email,
+        type: 'APPOINTMENT_CANCELLED',
+        title: 'Appointment cancelled',
+        body: cancelBody,
+        payload: namesPayload,
+        resourceType: 'Appointment',
+        resourceId: appointment.id,
+      });
+    }),
+  );
 }
 
 export async function recordConsent(
@@ -159,6 +261,39 @@ export async function recordConsent(
     resourceId: appointmentId,
     metadata: { consentStatus: input.consentStatus },
   });
+
+  if (appointment.doctor) {
+    const central = getCentralPrisma();
+    const doctorUser = await central.user.findUnique({
+      where: { id: appointment.doctor.userId },
+    });
+    const patientName = formatPatientName(patient);
+    const doctorName = formatDoctorName(appointment.doctor);
+    const dateStr = await formatAppointmentScheduledAt(
+      tenantPrisma,
+      appointment.doctorId,
+      auth.orgId,
+      appointment.scheduledAt,
+    );
+    if (doctorUser) {
+      await notifyUserWithTemplate({
+        tenantPrisma,
+        orgId: auth.orgId,
+        userId: appointment.doctor.userId,
+        userEmail: doctorUser.email,
+        type: 'CONSENT_RECORDED',
+        title: 'Recording consent updated',
+        body: `${patientName} ${input.consentStatus === 'accepted' ? 'accepted' : 'declined'} recording for the appointment with ${doctorName} on ${dateStr}.`,
+        payload: {
+          ...appointmentNamePayload(patientName, doctorName),
+          consentStatus: input.consentStatus,
+          date: dateStr,
+        },
+        resourceType: 'Appointment',
+        resourceId: appointmentId,
+      });
+    }
+  }
 
   return updated;
 }

@@ -1,8 +1,8 @@
 import type { PrismaClient } from '../../../node_modules/.prisma/tenant-client/index.js';
 import * as repo from './ai-outputs.repository.js';
 import { consultationFinalizeQueue, embeddingQueue } from '../../jobs/queue.js';
-import { getEmailAdapter } from '../../adapters/email/index.js';
 import { getCentralPrisma, getTenantDbUrl } from '../../core/tenant-registry.js';
+import { notifyUserWithTemplate } from '../notifications/notifications.service.js';
 import { auditLog } from '../../core/audit-logger.js';
 import { buildSpeakerLabelsFromAppointment } from '../consultations/consultation-speaker-labels.js';
 import { reconcileStuckProcessingRecording } from '../consultations/consultation-recording-status.js';
@@ -130,13 +130,17 @@ export async function approveOutput(
   });
 
   if (patientUser && output.type === 'patient_summary') {
-    getEmailAdapter()
-      .send({
-        to: patientUser.email,
-        subject: 'Your Visit Summary Is Ready — CareMind AI',
-        html: '<p>Your doctor has reviewed and approved your visit summary. Log in to view it.</p>',
-      })
-      .catch(() => { /* non-blocking */ });
+    await notifyUserWithTemplate({
+      tenantPrisma,
+      orgId: auth.orgId,
+      userId: appointment.patient.userId,
+      userEmail: patientUser.email,
+      type: 'SUMMARY_READY',
+      title: 'Visit summary ready',
+      body: 'Your doctor has approved your visit summary. Log in to view it.',
+      resourceType: 'Appointment',
+      resourceId: output.appointmentId,
+    });
   }
 
   await auditLog({

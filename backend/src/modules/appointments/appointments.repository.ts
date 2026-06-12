@@ -10,6 +10,7 @@ export async function createAppointment(
     doctorId: string;
     scheduledAt: Date;
     livekitRoomName: string;
+    status?: 'pending_approval' | 'scheduled';
   },
 ) {
   return prisma.appointment.create({ data });
@@ -48,7 +49,7 @@ export async function updateAppointment(
   prisma: PrismaClient,
   id: string,
   data: Partial<{
-    status: 'scheduled' | 'in_progress' | 'completed' | 'cancelled';
+    status: 'pending_approval' | 'scheduled' | 'in_progress' | 'completed' | 'cancelled';
     scheduledAt: Date;
     consentStatus: 'pending' | 'accepted' | 'declined';
     consentTimestamp: Date;

@@ -2,6 +2,7 @@ import { Badge, type BadgeVariant } from '@/components/ui';
 import type { AppointmentStatus, AiOutputStatus, DocumentProcessingStatus, ConsentStatus } from '@/types';
 
 const appointmentStatusConfig: Record<AppointmentStatus, { label: string; variant: BadgeVariant; pulse?: boolean }> = {
+  pending_approval: { label: 'Pending Approval', variant: 'warning' },
   scheduled: { label: 'Scheduled', variant: 'primary' },
   in_progress: { label: 'In Progress', variant: 'warning', pulse: true },
   completed: { label: 'Completed', variant: 'success' },

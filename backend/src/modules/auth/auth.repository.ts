@@ -33,9 +33,16 @@ export async function createUser(
     passwordHash: string;
     role: UserRole;
     orgId: string;
+    timezone?: string;
   },
 ) {
-  return prisma.user.create({ data: { ...data, role: data.role } });
+  return prisma.user.create({
+    data: {
+      ...data,
+      role: data.role,
+      ...(data.timezone !== undefined && { timezone: data.timezone }),
+    },
+  });
 }
 
 export async function saveRefreshToken(

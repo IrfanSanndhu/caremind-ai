@@ -21,6 +21,14 @@ import {
   enrichSegmentsForApi,
   formatTranscriptFromSegments,
 } from './consultation-speaker-labels.js';
+import * as apptRepo from '../appointments/appointments.repository.js';
+import { notifyUserWithTemplate } from '../notifications/notifications.service.js';
+import { formatAppointmentScheduledAt } from '../notifications/appointment-datetime.js';
+import {
+  appointmentNamePayload,
+  formatDoctorName,
+  formatPatientName,
+} from '../notifications/appointment-names.js';
 
 type AppointmentWithProfiles = NonNullable<
   Awaited<ReturnType<typeof repo.findAppointmentById>>
@@ -67,6 +75,13 @@ export async function getJoinToken(
     throw new NotFoundError('Appointment not found');
   }
 
+  if (appointment.status === 'pending_approval') {
+    throw new ForbiddenError('Appointment must be approved before joining');
+  }
+  if (appointment.status === 'cancelled' || appointment.status === 'completed') {
+    throw new ForbiddenError('This appointment is not available for consultation');
+  }
+
   if (auth.role === 'patient') {
     const patient = await repo.findPatientByUserId(tenantPrisma, auth.userId);
     if (!patient || appointment.patientId !== patient.id) {
@@ -101,6 +116,61 @@ export async function getJoinToken(
     }),
   });
 
+  let appointmentStatus = appointment.status;
+  if (auth.role === 'doctor' && appointment.status === 'scheduled') {
+    await apptRepo.updateAppointment(tenantPrisma, appointmentId, { status: 'in_progress' });
+    appointmentStatus = 'in_progress';
+  }
+
+  const dateStr = await formatAppointmentScheduledAt(
+    tenantPrisma,
+    appointment.doctorId,
+    auth.orgId,
+    appointment.scheduledAt,
+  );
+  const central = getCentralPrisma();
+  const patientName = appointment.patient
+    ? formatPatientName(appointment.patient)
+    : 'the patient';
+  const doctorName = appointment.doctor
+    ? formatDoctorName(appointment.doctor)
+    : 'the doctor';
+  const namesPayload = appointmentNamePayload(patientName, doctorName);
+
+  const notifyJoin = async (targetUserId: string, userEmail?: string) => {
+    if (targetUserId === auth.userId) return;
+    await notifyUserWithTemplate({
+      tenantPrisma,
+      orgId: auth.orgId,
+      userId: targetUserId,
+      userEmail,
+      type: 'CONSULTATION_JOINED',
+      title: 'Participant joined consultation',
+      body: `${displayName} joined the consultation for the appointment between ${patientName} and ${doctorName} on ${dateStr}.`,
+      payload: { participantName: displayName, ...namesPayload, date: dateStr },
+      resourceType: 'Appointment',
+      resourceId: appointmentId,
+      metadata: { joinedByRole: auth.role },
+    });
+  };
+
+  if (auth.role === 'patient' && appointment.doctor) {
+    const doctorUser = await central.user.findUnique({ where: { id: appointment.doctor.userId } });
+    await notifyJoin(appointment.doctor.userId, doctorUser?.email);
+  } else if (auth.role === 'doctor' && appointment.patient) {
+    const patientUser = await central.user.findUnique({ where: { id: appointment.patient.userId } });
+    await notifyJoin(appointment.patient.userId, patientUser?.email);
+  } else if (auth.role === 'admin') {
+    if (appointment.doctor) {
+      const doctorUser = await central.user.findUnique({ where: { id: appointment.doctor.userId } });
+      await notifyJoin(appointment.doctor.userId, doctorUser?.email);
+    }
+    if (appointment.patient) {
+      const patientUser = await central.user.findUnique({ where: { id: appointment.patient.userId } });
+      await notifyJoin(appointment.patient.userId, patientUser?.email);
+    }
+  }
+
   await auditLog({
     tenantPrisma,
     userId: auth.userId,
@@ -110,7 +180,87 @@ export async function getJoinToken(
     resourceId: appointmentId,
   });
 
-  return { token, roomName, livekitUrl: env.LIVEKIT_URL };
+  return {
+    token,
+    roomName,
+    livekitUrl: env.LIVEKIT_URL,
+    appointmentStatus,
+  };
+}
+
+export async function getLivePresence(
+  auth: AuthContext,
+  tenantPrisma: PrismaClient,
+) {
+  const { role, orgId, userId } = auth;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const where: Record<string, any> = {
+    orgId,
+    status: { in: ['scheduled', 'in_progress'] },
+  };
+
+  if (role === 'patient') {
+    const patient = await repo.findPatientByUserId(tenantPrisma, userId);
+    if (patient) where['patientId'] = patient.id;
+  } else if (role === 'doctor') {
+    const doctor = await repo.findDoctorByUserId(tenantPrisma, userId);
+    if (doctor) where['doctorId'] = doctor.id;
+  }
+
+  const appointments = await tenantPrisma.appointment.findMany({
+    where,
+    select: {
+      id: true,
+      livekitRoomName: true,
+      patient: { select: { firstName: true, lastName: true, userId: true } },
+      doctor: { select: { firstName: true, lastName: true, userId: true } },
+    },
+    take: 100,
+  });
+
+  const livekit = getLiveKitAdapter();
+  const presence: Record<
+    string,
+    { participants: { identity: string; name: string; role?: string }[] }
+  > = {};
+
+  await Promise.all(
+    appointments.map(async (appt) => {
+      const roomName = appt.livekitRoomName ?? `${orgId}_${appt.id}`;
+      try {
+        const participants = await livekit.listParticipants(roomName);
+        if (participants.length === 0) return;
+
+        presence[appt.id] = {
+          participants: participants.map((p) => {
+            let role: string | undefined;
+            if (p.metadata) {
+              try {
+                const meta = JSON.parse(p.metadata) as { role?: string };
+                role = meta.role;
+              } catch {
+                /* ignore */
+              }
+            }
+            if (!role) {
+              if (p.identity === appt.patient?.userId) role = 'patient';
+              else if (p.identity === appt.doctor?.userId) role = 'doctor';
+              else role = 'admin';
+            }
+            return {
+              identity: p.identity,
+              name: p.name || p.identity,
+              role,
+            };
+          }),
+        };
+      } catch {
+        /* room may not exist yet */
+      }
+    }),
+  );
+
+  return presence;
 }
 
 export async function startRecording(
