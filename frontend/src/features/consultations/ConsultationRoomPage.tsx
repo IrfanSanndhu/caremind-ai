@@ -6,7 +6,6 @@ import toast from 'react-hot-toast';
 import { Button, Card, Spinner } from '@/components/ui';
 import { appointmentsApi, appointmentKeys } from '@/api/appointments.api';
 import { consultationsApi, consultationKeys } from '@/api/consultations.api';
-import { dashboardKeys } from '@/api/dashboard.api';
 import { useAuthStore } from '@/stores/auth.store';
 import { useConsultationSessionStore } from '@/stores/consultation-session.store';
 import { UserRole } from '@/types';
@@ -101,7 +100,7 @@ export function ConsultationRoomPage() {
       });
 
       void queryClient.invalidateQueries({ queryKey: appointmentKeys.all });
-      void queryClient.invalidateQueries({ queryKey: dashboardKeys.all });
+      void queryClient.invalidateQueries({ queryKey: ['dashboard'] });
       void queryClient.invalidateQueries({ queryKey: consultationKeys.livePresence() });
     } catch {
       setTokenError('Failed to join consultation. Please try again.');
